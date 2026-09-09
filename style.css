@@ -1,0 +1,162 @@
+/* ==========================================================================
+   EXCEL WAREHOUSE ERP - STYLESHEET
+   ========================================================================== */
+
+:root {
+  --excel-green-main: #107C41;
+  --excel-green-dark: #0E5C30;
+  --excel-green-light: #21A366;
+  --excel-border: #D1D5DB;
+  --excel-header-bg: #F3F4F6;
+  --excel-active-cell: #107C41;
+}
+
+body {
+  font-family: 'Cairo', 'Tajawal', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  direction: rtl;
+  text-align: right;
+  background-color: #F8FAFC;
+  color: #1F2937;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Custom Scrollbar for Excel Look */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F1F5F9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #94A3B8;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #64748B;
+}
+
+/* Navigation active item style */
+.nav-item.active {
+  background-color: #E1F2E5;
+  color: #0E5C30;
+  font-weight: 800;
+  border-right: 4px solid #107C41;
+}
+
+/* Report tab button active style */
+.report-tab-btn.active {
+  background-color: #107C41;
+  color: #ffffff;
+  border-color: #107C41;
+  box-shadow: 0 2px 4px rgba(16, 124, 65, 0.25);
+}
+
+.report-tab-btn {
+  background-color: #F9FAFB;
+  color: #374151;
+  border-color: #E5E7EB;
+}
+
+.report-tab-btn:hover:not(.active) {
+  background-color: #F3F4F6;
+  border-color: #D1D5DB;
+}
+
+/* Excel Grid specific styling */
+.excel-grid th, 
+.excel-grid td {
+  border: 1px solid #E2E8F0;
+  white-space: nowrap;
+}
+
+.excel-grid tbody tr:hover {
+  background-color: #F0FDF4;
+}
+
+.excel-grid tbody tr:nth-child(even) {
+  background-color: #FAFAFA;
+}
+
+.excel-grid tbody tr:nth-child(even):hover {
+  background-color: #F0FDF4;
+}
+
+/* Animation utilities */
+@keyframes scaleUp {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-up {
+  animation: scaleUp 0.18s ease-out forwards;
+}
+
+/* Toast styling */
+.toast-item {
+  animation: toastSlide 0.25s ease-out forwards;
+}
+
+@keyframes toastSlide {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Print Styles for official reporting */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  header, 
+  aside, 
+  #sidebarBackdrop,
+  .no-print,
+  #view-dashboard,
+  #view-excel,
+  #view-cuts,
+  #view-transactions,
+  #view-audit,
+  #view-tools,
+  .modal-overlay {
+    display: none !important;
+  }
+
+  #view-reports {
+    display: block !important;
+  }
+
+  #printableReportArea {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+
+  main {
+    height: auto !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
+  .report-tab-btn,
+  .bg-white > div > div.flex.items-center.gap-2 {
+    display: none !important;
+  }
+}

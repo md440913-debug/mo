@@ -1,0 +1,23 @@
+{
+  "name": "excel-cuts-warehouse-web",
+  "version": "2.0.0",
+  "description": "نظام مخازن القصات إكسل - تطبيق ويب متكامل لإدارة مستودعات الملابس",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "build": "echo 'Build complete'"
+  },
+  "keywords": [
+    "warehouse",
+    "excel",
+    "cuts",
+    "inventory",
+    "erp",
+    "responsive",
+    "arabic",
+    "rtl"
+  ],
+  "author": "AI Studio",
+  "license": "MIT"
+}

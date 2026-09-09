@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>مخازن القصات إكسل • Excel Warehouse ERP</title>
+  <meta name="description" content="نظام متكامل واحترافي لإدارة مخازن وقصات الملابس مع جداول إكسل وحركات الوارد والمنصرف ومنع الصرف السالب ومطابقة الجرد">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            excel: {
+              50: '#F3F9F4',
+              100: '#E1F2E5',
+              200: '#C2E5C9',
+              300: '#94D1A0',
+              400: '#5FB870',
+              500: '#21A366',
+              600: '#107C41', // Main Excel Green
+              700: '#0E5C30',
+              800: '#0B4725',
+              900: '#07331A',
+            },
+            stockin: '#16A34A',
+            stockout: '#DC2626',
+          },
+          fontFamily: {
+            cairo: ['Cairo', 'Tajawal', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts: Cairo & Tajawal -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
+
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-gray-100 text-gray-800 font-cairo antialiased min-h-screen flex flex-col md:flex-row overflow-x-hidden">
+
+  <!-- ======================== TOAST NOTIFICATION CONTAINER ======================== -->
+  <div id="toastContainer" class="fixed top-5 left-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- ======================== MOBILE HEADER ======================== -->
+  <header class="md:hidden bg-excel-600 text-white px-4 py-3 flex items-center justify-between shadow-md sticky top-0 z-40">
+    <div class="flex items-center gap-3">
+      <button id="mobileMenuBtn" class="text-white hover:bg-excel-700 p-2 rounded-lg transition" aria-label="القائمة">
+        <i class="fa-solid fa-bars text-xl"></i>
+      </button>
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded bg-white text-excel-600 flex items-center justify-center font-black text-lg shadow">
+          <i class="fa-solid fa-file-excel"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-sm leading-tight">مخازن القصات</h1>
+          <p class="text-[10px] text-excel-100">Excel ERP Web</p>
+        </div>
+      </div>
+    </div>
+    
+    <div class="flex items-center gap-2">
+      <button onclick="openModal('stockInModal')" class="bg-stockin hover:bg-green-700 text-white text-xs font-bold px-2.5 py-1.5 rounded flex items-center gap-1 shadow">
+        <i class="fa-solid fa-plus"></i>
+        <span>وارد</span>
+      </button>
+      <button onclick="openModal('stockOutModal')" class="bg-stockout hover:bg-red-700 text-white text-xs font-bold px-2.5 py-1.5 rounded flex items-center gap-1 shadow">
+        <i class="fa-solid fa-minus"></i>
+        <span>صرف</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ======================== SIDEBAR (DESKTOP & MOBILE DRAWER) ======================== -->
+  <aside id="sidebar" class="fixed md:static inset-y-0 right-0 z-50 w-72 bg-white border-l border-gray-200 shadow-xl md:shadow-none flex flex-col transition-transform duration-300 transform translate-x-full md:translate-x-0 h-screen overflow-y-auto">
+    
+    <!-- Sidebar Brand -->
+    <div class="p-5 bg-gradient-to-br from-excel-700 to-excel-800 text-white relative">
+      <button id="closeMobileMenuBtn" class="md:hidden absolute top-4 left-4 text-white hover:bg-white/20 p-1.5 rounded-lg transition">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+
+      <div class="flex items-center gap-3 mb-2">
+        <div class="w-11 h-11 rounded-lg bg-white text-excel-700 flex items-center justify-center shadow-lg font-black text-2xl">
+          <i class="fa-solid fa-file-excel"></i>
+        </div>
+        <div>
+          <h2 class="font-extrabold text-base tracking-wide">مخازن القصات إكسل</h2>
+          <div class="flex items-center gap-1.5 text-xs text-excel-200">
+            <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+            <span>نظام المستودعات المتكامل</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick KPI Pill in Sidebar -->
+      <div class="mt-3 bg-black/20 backdrop-blur-sm rounded-lg p-2.5 border border-white/10 text-xs flex justify-between items-center">
+        <div>
+          <span class="text-excel-200 block text-[11px]">صافي رصيد المخزن</span>
+          <span id="sidebarBalancePieces" class="font-bold text-sm text-white">0 قطعة</span>
+        </div>
+        <div class="text-left">
+          <span class="text-excel-200 block text-[11px]">القصات النشطة</span>
+          <span id="sidebarActiveCuts" class="font-bold text-sm text-white">0 قصة</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Action Buttons -->
+    <div class="p-3 bg-gray-50 border-b border-gray-200 grid grid-cols-2 gap-2">
+      <button onclick="openModal('stockInModal')" class="bg-stockin hover:bg-green-700 text-white font-bold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 shadow transition">
+        <i class="fa-solid fa-arrow-down-long"></i>
+        <span>إدخال وارد</span>
+      </button>
+      <button onclick="openModal('stockOutModal')" class="bg-stockout hover:bg-red-700 text-white font-bold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 shadow transition">
+        <i class="fa-solid fa-arrow-up-long"></i>
+        <span>إخراج صرف</span>
+      </button>
+    </div>
+
+    <!-- Navigation Menu Items -->
+    <nav class="flex-1 p-3 space-y-1.5">
+      <button onclick="switchView('dashboard')" id="nav-dashboard" class="nav-item active w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-semibold transition text-gray-700 hover:bg-gray-100">
+        <i class="fa-solid fa-gauge-high w-5 text-center text-excel-600"></i>
+        <span>لوحة التحكم الرئيسية</span>
+      </button>
+
+      <button onclick="switchView('excel')" id="nav-excel" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-semibold transition text-gray-700 hover:bg-gray-100">
+        <i class="fa-solid fa-table w-5 text-center text-excel-600"></i>
+        <span>شيت المخزن إكسل (12 عمود)</span>
+      </button>
+
+      <button onclick="switchView('cuts')" id="nav-cuts" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-semibold transition text-gray-700 hover:bg-gray-100">
+        <i class="fa-solid fa-scissors w-5 text-center text-excel-600"></i>
+        <span>أرصدة وحالات القصات</span>
+      </button>
+
+      <button onclick="switchView('transactions')" id="nav-transactions" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-semibold transition text-gray-700 hover:bg-gray-100">
+        <i class="fa-solid fa-list-check w-5 text-center text-excel-600"></i>
+        <span>سجل حركات المخزن</span>
+      </button>
+
+      <button onclick="switchView('reports')" id="nav-reports" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-semibold transition text-gray-700 hover:bg-gray-100">
+        <i class="fa-solid fa-chart-pie w-5 text-center text-excel-600"></i>
+        <span>التقارير المعتمدة (11 تقرير)</span>
+      </button>
+
+      <button onclick="switchView('audit')" id="nav-audit" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-semibold transition text-gray-700 hover:bg-gray-100">
+        <i class="fa-solid fa-clipboard-check w-5 text-center text-excel-600"></i>
+        <span>محاضر الجرد والمطابقة</span>
+      </button>
+
+      <button onclick="switchView('tools')" id="nav-tools" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-semibold transition text-gray-700 hover:bg-gray-100">
+        <i class="fa-solid fa-database w-5 text-center text-excel-600"></i>
+        <span>أدوات إكسل والنسخ الاحتياطي</span>
+      </button>
+    </nav>
+
+    <!-- Sidebar Footer with Excel Quick Actions -->
+    <div class="p-3 bg-gray-50 border-t border-gray-200 text-xs space-y-2">
+      <div class="flex items-center justify-between text-gray-500 font-medium">
+        <span>تصدير سريع:</span>
+        <button onclick="exportWarehouseExcel()" class="text-excel-700 hover:text-excel-900 font-bold flex items-center gap-1 hover:underline">
+          <i class="fa-solid fa-file-arrow-down"></i>
+          <span>تحميل شيت Excel</span>
+        </button>
+      </div>
+      <div class="text-[11px] text-gray-400 text-center pt-1 border-t border-gray-200">
+        نظام ويب متجاوب • تخزين محلي آمن
+      </div>
+    </div>
+  </aside>
+
+  <!-- Mobile Backdrop -->
+  <div id="sidebarBackdrop" class="fixed inset-0 bg-black/50 z-40 hidden md:hidden"></div>
+
+  <!-- ======================== MAIN CONTENT VIEWPORT ======================== -->
+  <main class="flex-1 flex flex-col h-screen overflow-y-auto">
+    
+    <!-- Top Action Bar (Desktop) -->
+    <div class="hidden md:flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200 shadow-sm sticky top-0 z-30">
+      <div class="flex items-center gap-4">
+        <div class="flex items-center gap-2 text-gray-700 font-bold text-sm">
+          <i class="fa-solid fa-building-circle-check text-excel-600 text-lg"></i>
+          <span id="currentViewTitle">لوحة التحكم والمؤشرات العامة</span>
+        </div>
+        <div class="h-4 w-px bg-gray-300"></div>
+        <div class="text-xs text-gray-500 flex items-center gap-2">
+          <span>التاريخ: <strong id="headerLiveDate" class="text-gray-700"></strong></span>
+          <span>•</span>
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-green-100 text-green-800">
+            <i class="fa-solid fa-circle-check ml-1 text-green-600"></i>
+            متصل بالنظام
+          </span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button onclick="openModal('stockInModal')" class="bg-stockin hover:bg-green-700 text-white text-xs font-bold px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow transition">
+          <i class="fa-solid fa-plus"></i>
+          <span>+ وارد جديد</span>
+        </button>
+        <button onclick="openModal('stockOutModal')" class="bg-stockout hover:bg-red-700 text-white text-xs font-bold px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow transition">
+          <i class="fa-solid fa-minus"></i>
+          <span>- صرف تشغيل</span>
+        </button>
+        <button onclick="exportWarehouseExcel()" class="bg-excel-600 hover:bg-excel-700 text-white text-xs font-bold px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow transition" title="تصدير شيت إكسل">
+          <i class="fa-solid fa-file-excel"></i>
+          <span>تصدير Excel</span>
+        </button>
+        <button onclick="openModal('addCutModal')" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold px-3.5 py-2 rounded-lg border border-gray-300 flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-folder-plus text-excel-600"></i>
+          <span>+ كود قصة</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- VIEW CONTAINER -->
+    <div class="p-4 md:p-6 flex-1 max-w-7xl w-full mx-auto space-y-6">
+
+      <!-- =================================================================== -->
+      <!-- VIEW 1: DASHBOARD -->
+      <!-- =================================================================== -->
+      <section id="view-dashboard" class="view-panel space-y-6">
+        
+        <!-- Period Filter & Welcome Header -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h2 class="text-lg font-extrabold text-gray-800 flex items-center gap-2">
+              <i class="fa-solid fa-chart-line text-excel-600"></i>
+              مؤشرات وأرصدة مستودع القصات
+            </h2>
+            <p class="text-xs text-gray-500 mt-0.5">متابعة لحظية لحركات الإدخال والصرف ونسب التشغيل والرصيد الدفتري المتاح</p>
+          </div>
+
+          <div class="flex items-center gap-2 w-full md:w-auto">
+            <span class="text-xs text-gray-500 font-semibold">فترة العرض:</span>
+            <select id="dashboardPeriodSelect" onchange="renderDashboard()" class="text-xs bg-gray-50 border border-gray-300 rounded-lg px-3 py-1.5 font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-excel-600">
+              <option value="all">كافة الفترات (الكل)</option>
+              <option value="today">حركات اليوم</option>
+              <option value="week">هذا الأسبوع</option>
+              <option value="month">هذا الشهر</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- KPI Cards Grid (4 Primary Cards) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          
+          <!-- Card 1: Net Stock Balance -->
+          <div class="bg-white p-4 rounded-xl shadow-sm border border-excel-200 relative overflow-hidden group hover:shadow-md transition">
+            <div class="absolute top-0 right-0 w-2 h-full bg-excel-600"></div>
+            <div class="flex items-start justify-between">
+              <div>
+                <p class="text-xs font-semibold text-gray-500">صافي الرصيد الحالي بالمخزن</p>
+                <h3 id="kpiNetPieces" class="text-2xl font-black text-excel-700 mt-1">0</h3>
+                <p id="kpiNetRolls" class="text-xs text-gray-600 mt-1">0 ثوب / رول</p>
+              </div>
+              <div class="w-10 h-10 rounded-lg bg-excel-50 text-excel-600 flex items-center justify-center text-lg shadow-inner">
+                <i class="fa-solid fa-boxes-stacked"></i>
+              </div>
+            </div>
+            <div class="mt-3 pt-2 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-500">
+              <span>الرصيد الدفتري الفعلي المتاح</span>
+              <span class="text-excel-600 font-bold">100% مدقق</span>
+            </div>
+          </div>
+
+          <!-- Card 2: Total Incoming -->
+          <div class="bg-white p-4 rounded-xl shadow-sm border border-green-200 relative overflow-hidden group hover:shadow-md transition">
+            <div class="absolute top-0 right-0 w-2 h-full bg-stockin"></div>
+            <div class="flex items-start justify-between">
+              <div>
+                <p class="text-xs font-semibold text-gray-500">إجمالي الوارد للمخزن</p>
+                <h3 id="kpiInPieces" class="text-2xl font-black text-green-700 mt-1">0</h3>
+                <p id="kpiInRolls" class="text-xs text-gray-600 mt-1">0 ثوب / رول</p>
+              </div>
+              <div class="w-10 h-10 rounded-lg bg-green-50 text-stockin flex items-center justify-center text-lg shadow-inner">
+                <i class="fa-solid fa-arrow-down"></i>
+              </div>
+            </div>
+            <div class="mt-3 pt-2 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-500">
+              <span id="kpiInCount">0 عملية وارد</span>
+              <span class="text-green-600 font-bold">+ إضافة</span>
+            </div>
+          </div>
+
+          <!-- Card 3: Total Outgoing -->
+          <div class="bg-white p-4 rounded-xl shadow-sm border border-red-200 relative overflow-hidden group hover:shadow-md transition">
+            <div class="absolute top-0 right-0 w-2 h-full bg-stockout"></div>
+            <div class="flex items-start justify-between">
+              <div>
+                <p class="text-xs font-semibold text-gray-500">إجمالي المنصرف للتشغيل</p>
+                <h3 id="kpiOutPieces" class="text-2xl font-black text-red-700 mt-1">0</h3>
+                <p id="kpiOutRolls" class="text-xs text-gray-600 mt-1">0 ثوب / رول</p>
+              </div>
+              <div class="w-10 h-10 rounded-lg bg-red-50 text-stockout flex items-center justify-center text-lg shadow-inner">
+                <i class="fa-solid fa-arrow-up"></i>
+              </div>
+            </div>
+            <div class="mt-3 pt-2 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-500">
+              <span id="kpiOutCount">0 عملية صرف</span>
+              <span class="text-red-600 font-bold">- صرف ورش</span>
+            </div>
+          </div>
+
+          <!-- Card 4: Total Cuts Registered -->
+          <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 relative overflow-hidden group hover:shadow-md transition">
+            <div class="absolute top-0 right-0 w-2 h-full bg-blue-600"></div>
+            <div class="flex items-start justify-between">
+              <div>
+                <p class="text-xs font-semibold text-gray-500">إجمالي القصات المسجلة</p>
+                <h3 id="kpiTotalCuts" class="text-2xl font-black text-blue-700 mt-1">0</h3>
+                <p id="kpiCutsStatusMini" class="text-xs text-gray-600 mt-1">0 متوفرة بالمخزن</p>
+              </div>
+              <div class="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-lg shadow-inner">
+                <i class="fa-solid fa-tags"></i>
+              </div>
+            </div>
+            <div class="mt-3 pt-2 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-500">
+              <span>أكواد وموديلات نشطة</span>
+              <button onclick="switchView('cuts')" class="text-blue-600 font-bold hover:underline">عرض الكل</button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Secondary KPIs: Cuts Status Breakdown & Summary -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          
+          <!-- Cuts Status Breakdown -->
+          <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 lg:col-span-2">
+            <h3 class="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+              <i class="fa-solid fa-chart-column text-excel-600"></i>
+              تصنيف وحالة القصات بالمخزن
+            </h3>
+            
+            <div class="grid grid-cols-3 gap-3">
+              <div class="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+                <span class="text-xs text-green-700 font-bold block">متاحة بالكامل</span>
+                <span id="statAvailableCuts" class="text-xl font-black text-green-800 my-1 block">0</span>
+                <span class="text-[10px] text-green-600">لم يبدأ الصرف منها</span>
+              </div>
+              <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">
+                <span class="text-xs text-amber-700 font-bold block">صرف جزئي</span>
+                <span id="statPartialCuts" class="text-xl font-black text-amber-800 my-1 block">0</span>
+                <span class="text-[10px] text-amber-600">قيد التشغيل بالمراحل</span>
+              </div>
+              <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-center">
+                <span class="text-xs text-gray-600 font-bold block">منصرفة بالكامل</span>
+                <span id="statEmptyCuts" class="text-xl font-black text-gray-700 my-1 block">0</span>
+                <span class="text-[10px] text-gray-500">الرصيد المتاح 0</span>
+              </div>
+            </div>
+
+            <!-- Visual Progress distribution -->
+            <div class="mt-4">
+              <div class="flex justify-between text-xs text-gray-500 mb-1">
+                <span>توزيع نسب الصرف العام للقصات</span>
+                <span id="overallIssuedPercent">0%</span>
+              </div>
+              <div class="w-full h-3 bg-gray-200 rounded-full overflow-hidden flex">
+                <div id="progressAvailableBar" class="bg-green-500 h-full transition-all duration-500" style="width: 33%"></div>
+                <div id="progressPartialBar" class="bg-amber-500 h-full transition-all duration-500" style="width: 33%"></div>
+                <div id="progressEmptyBar" class="bg-gray-400 h-full transition-all duration-500" style="width: 34%"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Daily & Monthly Quick Summary -->
+          <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-between">
+            <h3 class="text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
+              <i class="fa-solid fa-calendar-day text-excel-600"></i>
+              ملخص اليوم والشهر
+            </h3>
+
+            <div class="space-y-3">
+              <div class="p-2.5 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-between">
+                <div>
+                  <span class="text-xs text-gray-500 block">وارد اليوم</span>
+                  <span id="dashTodayIn" class="font-bold text-green-700 text-sm">0 قطعة</span>
+                </div>
+                <div class="text-left">
+                  <span class="text-xs text-gray-500 block">منصرف اليوم</span>
+                  <span id="dashTodayOut" class="font-bold text-red-700 text-sm">0 قطعة</span>
+                </div>
+              </div>
+
+              <div class="p-2.5 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-between">
+                <div>
+                  <span class="text-xs text-gray-500 block">وارد الشهر</span>
+                  <span id="dashMonthIn" class="font-bold text-green-700 text-sm">0 قطعة</span>
+                </div>
+                <div class="text-left">
+                  <span class="text-xs text-gray-500 block">منصرف الشهر</span>
+                  <span id="dashMonthOut" class="font-bold text-red-700 text-sm">0 قطعة</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-3 pt-2 border-t border-gray-100 flex gap-2">
+              <button onclick="switchView('excel')" class="w-full text-xs font-bold text-excel-700 bg-excel-50 hover:bg-excel-100 py-1.5 rounded-lg transition text-center">
+                فتح شيت إكسل <i class="fa-solid fa-arrow-left text-[10px]"></i>
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Recent Transactions Table Preview -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div class="p-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+            <div class="flex items-center gap-2">
+              <i class="fa-solid fa-clock-rotate-left text-excel-600"></i>
+              <h3 class="font-bold text-gray-800 text-sm">أحدث حركات المخزن المسجلة</h3>
+            </div>
+            <button onclick="switchView('transactions')" class="text-xs text-excel-700 font-bold hover:underline flex items-center gap-1">
+              <span>عرض كافة الحركات</span>
+              <i class="fa-solid fa-arrow-left text-[10px]"></i>
+            </button>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-right text-xs">
+              <thead class="bg-gray-50 text-gray-600 font-bold border-b border-gray-200">
+                <tr>
+                  <th class="p-3">رقم القصة</th>
+                  <th class="p-3">الموديل</th>
+                  <th class="p-3">نوع الحركة</th>
+                  <th class="p-3">المرحلة</th>
+                  <th class="p-3">القطع</th>
+                  <th class="p-3">الجهة / الورشة</th>
+                  <th class="p-3">التاريخ</th>
+                  <th class="p-3 text-center">إجراءات</th>
+                </tr>
+              </thead>
+              <tbody id="recentTransactionsTableBody" class="divide-y divide-gray-100">
+                <!-- Injected via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- VIEW 2: EXCEL SHEET VIEW (12 COLUMNS + FORMULA BAR) -->
+      <!-- =================================================================== -->
+      <section id="view-excel" class="view-panel hidden space-y-4">
+        
+        <!-- Excel Controls Bar -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded bg-excel-600 text-white flex items-center justify-center font-bold text-lg shadow">
+              <i class="fa-solid fa-table-cells"></i>
+            </div>
+            <div>
+              <h2 class="text-base font-extrabold text-gray-800">شيت المخزن التفاعلي • 12 عموداً (A - L)</h2>
+              <p class="text-xs text-gray-500">معاينة تفاعلية مع شريط الصيغ والحساب التلقائي وتجميد رأس الجدول</p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 flex-wrap">
+            <div class="relative">
+              <input type="text" id="excelSearchInput" oninput="renderExcelSheet()" placeholder="بحث في خلايا الشيت..." class="text-xs bg-gray-50 border border-gray-300 rounded-lg pl-3 pr-8 py-2 w-48 focus:outline-none focus:ring-2 focus:ring-excel-600">
+              <i class="fa-solid fa-magnifying-glass absolute right-2.5 top-2.5 text-gray-400 text-xs"></i>
+            </div>
+            
+            <select id="excelTypeFilter" onchange="renderExcelSheet()" class="text-xs bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-excel-600">
+              <option value="all">جميع الحركات</option>
+              <option value="وارد">وارد فقط (+)</option>
+              <option value="صرف">صرف فقط (-)</option>
+            </select>
+
+            <button onclick="exportWarehouseExcel()" class="bg-excel-600 hover:bg-excel-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow transition">
+              <i class="fa-solid fa-file-excel"></i>
+              <span>تصدير ملف Excel</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Formula Bar (fx) -->
+        <div class="bg-gray-50 border border-gray-300 rounded-lg p-2.5 flex items-center gap-3 shadow-inner">
+          <div class="bg-white border border-gray-300 rounded px-2.5 py-1 text-xs font-mono font-bold text-gray-700 shadow-sm">
+            fx
+          </div>
+          <div class="bg-white border border-gray-300 rounded px-3 py-1 text-xs font-mono font-bold text-excel-700 shadow-sm w-20 text-center">
+            E:TOTAL
+          </div>
+          <div class="flex-1 bg-white border border-gray-300 rounded px-3 py-1 text-xs font-mono text-gray-800 shadow-sm overflow-x-auto whitespace-nowrap">
+            <span class="text-blue-600 font-bold">=SUM(الوارد: قطع)</span>
+            <span class="text-gray-500"> - </span>
+            <span class="text-red-600 font-bold">SUM(المنصرف: قطع)</span>
+            <span class="text-gray-500"> = </span>
+            <strong id="formulaResultText" class="text-excel-700 font-bold font-sans">صافي الرصيد: 0 قطعة</strong>
+          </div>
+        </div>
+
+        <!-- 12-Column Spreadsheet Container -->
+        <div class="bg-white rounded-xl shadow border border-gray-300 overflow-hidden">
+          <div class="excel-table-wrapper max-h-[550px] overflow-auto">
+            <table class="w-full text-right text-xs border-collapse excel-grid">
+              
+              <!-- Column Letter Headers (A - L) -->
+              <thead class="bg-gray-100 text-gray-500 font-mono text-[11px] sticky top-0 z-20 shadow-sm">
+                <tr class="border-b border-gray-300">
+                  <th class="p-2 border-l border-gray-300 w-10 text-center bg-gray-200">#</th>
+                  <th class="p-2 border-l border-gray-300 text-center">A</th>
+                  <th class="p-2 border-l border-gray-300 text-center">B</th>
+                  <th class="p-2 border-l border-gray-300 text-center">C</th>
+                  <th class="p-2 border-l border-gray-300 text-center">D</th>
+                  <th class="p-2 border-l border-gray-300 text-center">E</th>
+                  <th class="p-2 border-l border-gray-300 text-center">F</th>
+                  <th class="p-2 border-l border-gray-300 text-center">G</th>
+                  <th class="p-2 border-l border-gray-300 text-center">H</th>
+                  <th class="p-2 border-l border-gray-300 text-center">I</th>
+                  <th class="p-2 border-l border-gray-300 text-center">J</th>
+                  <th class="p-2 border-l border-gray-300 text-center">K</th>
+                  <th class="p-2 border-l border-gray-300 text-center">L</th>
+                  <th class="p-2 text-center bg-gray-200">إجراءات</th>
+                </tr>
+                
+                <!-- Column Name Headers -->
+                <tr class="bg-excel-700 text-white font-bold border-b border-excel-800 text-xs">
+                  <th class="p-2.5 border-l border-excel-800 text-center">م</th>
+                  <th class="p-2.5 border-l border-excel-800 cursor-pointer hover:bg-excel-800" onclick="sortExcel('cutNumber')">
+                    رقم القصة <i class="fa-solid fa-sort text-[10px] opacity-70"></i>
+                  </th>
+                  <th class="p-2.5 border-l border-excel-800 cursor-pointer hover:bg-excel-800" onclick="sortExcel('modelName')">
+                    الموديل <i class="fa-solid fa-sort text-[10px] opacity-70"></i>
+                  </th>
+                  <th class="p-2.5 border-l border-excel-800 text-center">نوع الحركة</th>
+                  <th class="p-2.5 border-l border-excel-800 text-center">المرحلة</th>
+                  <th class="p-2.5 border-l border-excel-800 text-center bg-excel-800">القطع (E)</th>
+                  <th class="p-2.5 border-l border-excel-800 text-center">الأثواب (F)</th>
+                  <th class="p-2.5 border-l border-excel-800 text-center">الوزن كجم (G)</th>
+                  <th class="p-2.5 border-l border-excel-800">الجهة / الورشة (H)</th>
+                  <th class="p-2.5 border-l border-excel-800">المسؤول (I)</th>
+                  <th class="p-2.5 border-l border-excel-800 text-center">التاريخ (J)</th>
+                  <th class="p-2.5 border-l border-excel-800 text-center">رقم المستند (K)</th>
+                  <th class="p-2.5 border-l border-excel-800">الملاحظات (L)</th>
+                  <th class="p-2.5 text-center">خيارات</th>
+                </tr>
+              </thead>
+
+              <!-- Dynamic Rows -->
+              <tbody id="excelTableBody" class="divide-y divide-gray-200 bg-white">
+                <!-- Injected via JS -->
+              </tbody>
+
+              <!-- Fixed Bottom Totals / Summary Row -->
+              <tfoot class="sticky bottom-0 z-10 bg-excel-50 font-black text-gray-900 border-t-2 border-excel-600 shadow-md">
+                <tr>
+                  <td class="p-2.5 border-l border-gray-300 text-center bg-excel-100">Σ</td>
+                  <td colspan="3" class="p-2.5 border-l border-gray-300 text-excel-800 font-extrabold">
+                    الإجماليات الكلية للمخزن
+                  </td>
+                  <td class="p-2.5 border-l border-gray-300 text-center text-xs text-gray-500">المجموع:</td>
+                  <td id="excelTotalPiecesCell" class="p-2.5 border-l border-gray-300 text-center font-mono text-sm text-excel-700 bg-excel-100">0</td>
+                  <td id="excelTotalRollsCell" class="p-2.5 border-l border-gray-300 text-center font-mono text-sm text-excel-700">0</td>
+                  <td id="excelTotalWeightCell" class="p-2.5 border-l border-gray-300 text-center font-mono text-sm text-gray-700">0 كجم</td>
+                  <td colspan="6" class="p-2.5 text-left text-xs text-excel-800">
+                    <span id="excelNetBalanceSummary">صافي الرصيد: 0 قطعة</span>
+                  </td>
+                </tr>
+              </tfoot>
+
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- VIEW 3: CUTS BALANCES & MANAGEMENT -->
+      <!-- =================================================================== -->
+      <section id="view-cuts" class="view-panel hidden space-y-4">
+        
+        <!-- Cuts Header & Action -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+          <div>
+            <h2 class="text-base font-extrabold text-gray-800 flex items-center gap-2">
+              <i class="fa-solid fa-scissors text-excel-600"></i>
+              أرصدة وحالات القصات المسجلة
+            </h2>
+            <p class="text-xs text-gray-500">متابعة الكميات المستهدفة والمنصرفة والمتبقية لكل كود قصة بشكل منفصل</p>
+          </div>
+
+          <div class="flex items-center gap-2 flex-wrap w-full md:w-auto">
+            <input type="text" id="cutsSearchInput" oninput="renderCutsView()" placeholder="بحث برقم القصة أو الموديل..." class="text-xs bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 w-48 focus:outline-none focus:ring-2 focus:ring-excel-600">
+            
+            <select id="cutsFilterStatus" onchange="renderCutsView()" class="text-xs bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-excel-600">
+              <option value="all">كافة الحالات</option>
+              <option value="available">متاح بالمخزن (رصيد > 0)</option>
+              <option value="partial">منصرف جزئياً</option>
+              <option value="empty">منصرف بالكامل (رصيد = 0)</option>
+            </select>
+
+            <button onclick="openModal('addCutModal')" class="bg-excel-600 hover:bg-excel-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow transition">
+              <i class="fa-solid fa-plus"></i>
+              <span>+ قصة جديدة</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Cuts Grid Cards -->
+        <div id="cutsCardsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- Injected via JS -->
+        </div>
+
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- VIEW 4: TRANSACTIONS LOG -->
+      <!-- =================================================================== -->
+      <section id="view-transactions" class="view-panel hidden space-y-4">
+        
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+          <div>
+            <h2 class="text-base font-extrabold text-gray-800 flex items-center gap-2">
+              <i class="fa-solid fa-clock-rotate-left text-excel-600"></i>
+              سجل حركات المخزن التفصيلي
+            </h2>
+            <p class="text-xs text-gray-500">سجل كامل بجميع عمليات التوريد والصرف مع إمكانية التصفية والتعديل والحذف</p>
+          </div>
+
+          <div class="flex items-center gap-2 flex-wrap">
+            <input type="text" id="txSearchInput" oninput="renderTransactionsView()" placeholder="بحث في السجل..." class="text-xs bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 w-44 focus:outline-none focus:ring-2 focus:ring-excel-600">
+            
+            <select id="txTypeFilter" onchange="renderTransactionsView()" class="text-xs bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-excel-600">
+              <option value="all">كل الحركات</option>
+              <option value="وارد">وارد فقط (+)</option>
+              <option value="صرف">صرف فقط (-)</option>
+            </select>
+
+            <select id="txStageFilter" onchange="renderTransactionsView()" class="text-xs bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-excel-600">
+              <option value="all">كل المراحل</option>
+              <option value="قص">قص</option>
+              <option value="خياطة">خياطة</option>
+              <option value="طباعة">طباعة</option>
+              <option value="تطريز">تطريز</option>
+              <option value="تجهيز">تجهيز</option>
+              <option value="تشطيب">تشطيب</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-right text-xs">
+              <thead class="bg-gray-50 text-gray-600 font-bold border-b border-gray-200">
+                <tr>
+                  <th class="p-3">رقم القصة</th>
+                  <th class="p-3">الموديل</th>
+                  <th class="p-3 text-center">النوع</th>
+                  <th class="p-3 text-center">المرحلة</th>
+                  <th class="p-3 text-center">القطع</th>
+                  <th class="p-3 text-center">الأثواب</th>
+                  <th class="p-3 text-center">الوزن كجم</th>
+                  <th class="p-3">الجهة / الورشة</th>
+                  <th class="p-3">المسؤول</th>
+                  <th class="p-3 text-center">التاريخ</th>
+                  <th class="p-3 text-center">رقم المستند</th>
+                  <th class="p-3 text-center">إجراءات</th>
+                </tr>
+              </thead>
+              <tbody id="transactionsTableBody" class="divide-y divide-gray-100">
+                <!-- Injected via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- VIEW 5: 11 DETAILED REPORTS -->
+      <!-- =================================================================== -->
+      <section id="view-reports" class="view-panel hidden space-y-4">
+        
+        <!-- Reports Selector Panel -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 space-y-4">
+          <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+            <div>
+              <h2 class="text-base font-extrabold text-gray-800 flex items-center gap-2">
+                <i class="fa-solid fa-file-invoice text-excel-600"></i>
+                منظومة التقارير المعتمدة (11 تقرير تفصيلي)
+              </h2>
+              <p class="text-xs text-gray-500">اختر نوع التقرير لعرض الإحصائيات مع إمكانية التصدير والطباعة الرسمية</p>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <button onclick="printCurrentReport()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold px-3 py-2 rounded-lg border border-gray-300 flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-print"></i>
+                <span>طباعة التقرير</span>
+              </button>
+              <button onclick="exportReportToExcel()" class="bg-excel-600 hover:bg-excel-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow transition">
+                <i class="fa-solid fa-file-excel"></i>
+                <span>تصدير Excel</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 11 Report Types Grid Selector -->
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+            <button onclick="selectReport(1)" id="repBtn-1" class="report-tab-btn active text-right p-2.5 rounded-lg border text-xs font-bold transition">
+              1. حركة المخزن العامة
+            </button>
+            <button onclick="selectReport(2)" id="repBtn-2" class="report-tab-btn text-right p-2.5 rounded-lg border text-xs font-bold transition">
+              2. أرصدة وجرد القصات
+            </button>
+            <button onclick="selectReport(3)" id="repBtn-3" class="report-tab-btn text-right p-2.5 rounded-lg border text-xs font-bold transition">
+              3. تقرير الوارد بالتفصيل
+            </button>
+            <button onclick="selectReport(4)" id="repBtn-4" class="report-tab-btn text-right p-2.5 rounded-lg border text-xs font-bold transition">
+              4. تقرير المنصرف بالتفصيل
+            </button>
+            <button onclick="selectReport(5)" id="repBtn-5" class="report-tab-btn text-right p-2.5 rounded-lg border text-xs font-bold transition">
+              5. تقرير حسب الموديل
+            </button>
+            <button onclick="selectReport(6)" id="repBtn-6" class="report-tab-btn text-right p-2.5 rounded-lg border text-xs font-bold transition">
+              6. تقرير حسب القماش
+            </button>
+            <button onclick="selectReport(7)" id="repBtn-7" class="report-tab-btn text-right p-2.5 rounded-lg border text-xs font-bold transition">
+              7. تقرير حسب الورشة
+            </button>
+            <button onclick="selectReport(8)" id="repBtn-8" class="report-tab-btn text-right p-2.5 rounded-lg border text-xs font-bold transition">
+              8. تقرير حسب المرحلة
+            </button>
+            <button onclick="selectReport(9)" id="repBtn-9" class="report-tab-btn text-right p-2.5 rounded-lg border text-xs font-bold transition">
+              9. تقرير جرد المخزن
+            </button>
+            <button onclick="selectReport(10)" id="repBtn-10" class="report-tab-btn text-right p-2.5 rounded-lg border text-xs font-bold transition">
+              10. القصات المنصرفة بالكامل
+            </button>
+            <button onclick="selectReport(11)" id="repBtn-11" class="report-tab-btn text-right p-2.5 rounded-lg border text-xs font-bold transition">
+              11. القصات ذات الرصيد المتاح
+            </button>
+          </div>
+        </div>
+
+        <!-- Generated Report Output (Printable Card) -->
+        <div id="printableReportArea" class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
+          
+          <!-- Report Header Banner -->
+          <div class="border-b-2 border-excel-600 pb-4 flex justify-between items-start">
+            <div>
+              <span class="text-xs font-bold text-excel-700 uppercase tracking-wider block">نظام إدارة المخازن • تقرير رسمي</span>
+              <h3 id="reportViewTitle" class="text-xl font-extrabold text-gray-900 mt-1">تقرير حركة المخزن العامة</h3>
+              <p id="reportViewSubtitle" class="text-xs text-gray-500 mt-0.5">بيان تفصيلي بجميع الحركات المسجلة</p>
+            </div>
+            <div class="text-left text-xs text-gray-500">
+              <p>تاريخ التقرير: <strong id="reportDateStamp" class="text-gray-800"></strong></p>
+              <p class="mt-0.5">عدد السجلات: <strong id="reportRecordCount" class="text-excel-700">0</strong></p>
+            </div>
+          </div>
+
+          <!-- Report Summary Metrics Bar -->
+          <div id="reportSummaryMetrics" class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-gray-50 p-3 rounded-lg border border-gray-200 text-xs">
+            <!-- Dynamic KPI items injected via JS -->
+          </div>
+
+          <!-- Report Data Table -->
+          <div class="overflow-x-auto">
+            <table class="w-full text-right text-xs border-collapse">
+              <thead id="reportTableHead" class="bg-excel-700 text-white font-bold">
+                <!-- Injected via JS -->
+              </thead>
+              <tbody id="reportTableBody" class="divide-y divide-gray-200">
+                <!-- Injected via JS -->
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pt-4 border-t border-gray-200 flex justify-between items-center text-xs text-gray-400">
+            <span>تم استخراج التقرير آلياً عبر نظام مخازن القصات إكسل</span>
+            <span>توقيع المسؤول / أمين المخزن: ............................</span>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- VIEW 6: AUDIT & RECONCILIATION -->
+      <!-- =================================================================== -->
+      <section id="view-audit" class="view-panel hidden space-y-4">
+        
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+          <div>
+            <h2 class="text-base font-extrabold text-gray-800 flex items-center gap-2">
+              <i class="fa-solid fa-clipboard-check text-excel-600"></i>
+              محاضر الجرد الدوري ومطابقة الأرصدة الدفترية
+            </h2>
+            <p class="text-xs text-gray-500">إدخال الرصيد الفعلي المعدود على الطبيعة، واحتساب الفروقات آلياً (الفرق = الفعلي - الدفتري)</p>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button onclick="saveAuditProtocol()" class="bg-excel-600 hover:bg-excel-700 text-white text-xs font-bold px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow transition">
+              <i class="fa-solid fa-floppy-disk"></i>
+              <span>اعتماد محضر الجرد</span>
+            </button>
+            <button onclick="exportAuditToExcel()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold px-3.5 py-2 rounded-lg border border-gray-300 flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-file-excel text-excel-600"></i>
+              <span>تصدير شيت الجرد</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Audit Form Inputs -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">اسم القائم بالجرد *</label>
+            <input type="text" id="auditAuditorName" value="أمين المخزن / لجنة الجرد" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 font-semibold focus:ring-2 focus:ring-excel-600 focus:outline-none">
+          </div>
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">تاريخ الجرد *</label>
+            <input type="date" id="auditDateInput" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 font-semibold focus:ring-2 focus:ring-excel-600 focus:outline-none">
+          </div>
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">ملاحظات عامة على محضر الجرد</label>
+            <input type="text" id="auditGeneralNotes" placeholder="مثال: جرد نهاية شهر صيف 2025" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-excel-600 focus:outline-none">
+          </div>
+        </div>
+
+        <!-- Audit Table -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-right text-xs">
+              <thead class="bg-excel-700 text-white font-bold">
+                <tr>
+                  <th class="p-3">رقم القصة</th>
+                  <th class="p-3">الموديل</th>
+                  <th class="p-3 text-center">الرصيد الدفتري (قطع)</th>
+                  <th class="p-3 text-center">الرصيد الفعلي المعدود</th>
+                  <th class="p-3 text-center">الفرق (قطعة)</th>
+                  <th class="p-3 text-center">حالة المطابقة</th>
+                  <th class="p-3">أسباب الفروق / الملاحظات</th>
+                </tr>
+              </thead>
+              <tbody id="auditTableBody" class="divide-y divide-gray-100">
+                <!-- Injected via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- VIEW 7: TOOLS, BACKUP & EXCEL IMPORT/EXPORT -->
+      <!-- =================================================================== -->
+      <section id="view-tools" class="view-panel hidden space-y-4">
+        
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+          <h2 class="text-base font-extrabold text-gray-800 flex items-center gap-2">
+            <i class="fa-solid fa-database text-excel-600"></i>
+            إدارة البيانات والنسخ الاحتياطي واستيراد وتصدير Excel
+          </h2>
+          <p class="text-xs text-gray-500">حفظ ونقل البيانات واستيراد ملفات الإكسل مع الفحص والتدقيق الآلي</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          
+          <!-- Excel Export & Import Card -->
+          <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 space-y-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-lg bg-excel-50 text-excel-600 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-file-excel"></i>
+              </div>
+              <div>
+                <h3 class="font-bold text-sm text-gray-800">تصدير واستيراد ملفات Excel</h3>
+                <p class="text-xs text-gray-500">تصدير بترميز UTF-8 مع BOM لدعم الحروف العربية في Excel بنسبة 100%</p>
+              </div>
+            </div>
+
+            <div class="space-y-3 pt-2">
+              <button onclick="exportWarehouseExcel()" class="w-full bg-excel-600 hover:bg-excel-700 text-white font-bold py-2.5 px-4 rounded-lg text-xs flex items-center justify-center gap-2 shadow transition">
+                <i class="fa-solid fa-download"></i>
+                <span>تصدير شيت المخزن بالكامل (CSV / Excel)</span>
+              </button>
+
+              <div class="border-t border-gray-100 pt-3">
+                <label class="block text-xs font-bold text-gray-700 mb-1.5">استيراد حركات من ملف Excel / CSV:</label>
+                <input type="file" id="excelImportFileInput" accept=".csv, .txt" class="block w-full text-xs text-gray-500 file:mr-0 file:ml-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-excel-50 file:text-excel-700 hover:file:bg-excel-100 cursor-pointer">
+                <p class="text-[11px] text-gray-400 mt-1">سيتم فتح نافذة المعاينة والتدقيق قبل الاعتماد في قاعدة البيانات</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- JSON Backup & Restore Card -->
+          <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 space-y-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-cloud-arrow-down"></i>
+              </div>
+              <div>
+                <h3 class="font-bold text-sm text-gray-800">النسخ الاحتياطي الكامل (JSON Backup)</h3>
+                <p class="text-xs text-gray-500">تنزيل نسخة احتياطية لكافة القصات والحركات ومحاضر الجرد واستعادتها</p>
+              </div>
+            </div>
+
+            <div class="space-y-3 pt-2">
+              <button onclick="exportDatabaseJson()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-lg text-xs flex items-center justify-center gap-2 shadow transition">
+                <i class="fa-solid fa-file-export"></i>
+                <span>تنزيل نسخة احتياطية كاملة (JSON)</span>
+              </button>
+
+              <div class="border-t border-gray-100 pt-3">
+                <label class="block text-xs font-bold text-gray-700 mb-1.5">استعادة نسخة احتياطية سابقة:</label>
+                <input type="file" id="jsonRestoreFileInput" accept=".json" class="block w-full text-xs text-gray-500 file:mr-0 file:ml-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
+              </div>
+
+              <div class="border-t border-gray-100 pt-3">
+                <button onclick="confirmResetDemoData()" class="w-full bg-gray-100 hover:bg-red-50 hover:text-red-700 text-gray-600 font-bold py-2 px-3 rounded-lg text-xs border border-gray-300 transition flex items-center justify-center gap-1.5">
+                  <i class="fa-solid fa-arrows-rotate"></i>
+                  <span>إعادة تعيين البيانات النموذجية (Demo Data)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+
+    </div>
+  </main>
+
+  <!-- =================================================================== -->
+  <!-- MODAL 1: STOCK IN (إدخال وارد جديد) -->
+  <!-- =================================================================== -->
+  <div id="stockInModal" class="modal-overlay hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden animate-scale-up">
+      
+      <div class="bg-stockin text-white px-5 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <i class="fa-solid fa-arrow-down-long text-xl"></i>
+          <div>
+            <h3 class="font-bold text-base leading-tight">تسجيل وارد جديد للمخزن</h3>
+            <p class="text-xs text-green-100">إضافة قطع وأثواب إلى رصيد قصة</p>
+          </div>
+        </div>
+        <button onclick="closeModal('stockInModal')" class="text-white/80 hover:text-white p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="stockInForm" onsubmit="handleStockInSubmit(event)" class="p-5 space-y-3.5 text-xs">
+        
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">رقم القصة *</label>
+            <input type="text" id="inCutNumber" list="cutsListDatalist" required placeholder="مثال: CUT-101" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 font-bold focus:ring-2 focus:ring-stockin focus:outline-none" oninput="autoFillModelName(this.value, 'inModelName')">
+            <datalist id="cutsListDatalist"></datalist>
+          </div>
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">اسم الموديل *</label>
+            <input type="text" id="inModelName" required placeholder="مثال: تيشرت أوفر سايز" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 font-semibold focus:ring-2 focus:ring-stockin focus:outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">نوع القماش / الخامة</label>
+            <input type="text" id="inFabricType" placeholder="مثال: قطن سنجل ليكرا" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-stockin focus:outline-none">
+          </div>
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">اللون</label>
+            <input type="text" id="inColor" placeholder="مثال: أسود ملكي" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-stockin focus:outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3 bg-green-50/60 p-3 rounded-xl border border-green-200">
+          <div>
+            <label class="block font-bold text-green-900 mb-1">عدد القطع *</label>
+            <input type="number" id="inPieces" required min="1" placeholder="0" class="w-full bg-white border border-green-300 rounded-lg p-2 font-black text-sm text-green-800 focus:ring-2 focus:ring-stockin focus:outline-none">
+          </div>
+          <div>
+            <label class="block font-bold text-green-900 mb-1">الأثواب / الرولات</label>
+            <input type="number" id="inRolls" min="0" placeholder="0" class="w-full bg-white border border-green-300 rounded-lg p-2 font-bold text-sm focus:ring-2 focus:ring-stockin focus:outline-none">
+          </div>
+          <div>
+            <label class="block font-bold text-green-900 mb-1">الوزن (كجم)</label>
+            <input type="number" id="inWeight" step="0.1" min="0" placeholder="0.0" class="w-full bg-white border border-green-300 rounded-lg p-2 font-bold text-sm focus:ring-2 focus:ring-stockin focus:outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">المصدر / جهة التوريد</label>
+            <input type="text" id="inParty" value="مقصدار المصنع" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-stockin focus:outline-none">
+          </div>
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">اسم المستلم / المسؤول</label>
+            <input type="text" id="inResponsible" value="أمين المخزن" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-stockin focus:outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">التاريخ *</label>
+            <input type="date" id="inDate" required class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 font-semibold focus:ring-2 focus:ring-stockin focus:outline-none">
+          </div>
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">رقم إذن التوريد / المستند</label>
+            <input type="text" id="inDocNumber" placeholder="مثال: IN-2025-01" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-stockin focus:outline-none">
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-gray-700 mb-1">ملاحظات إضافية</label>
+          <input type="text" id="inNotes" placeholder="أي ملاحظات حول الجودة أو الخامة..." class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-stockin focus:outline-none">
+        </div>
+
+        <div class="pt-3 border-t border-gray-200 flex justify-end gap-2">
+          <button type="button" onclick="closeModal('stockInModal')" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg transition">إلغاء</button>
+          <button type="submit" class="px-5 py-2 bg-stockin hover:bg-green-700 text-white font-bold rounded-lg shadow transition flex items-center gap-1.5">
+            <i class="fa-solid fa-check"></i>
+            <span>تأكيد إدخال الوارد</span>
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- MODAL 2: STOCK OUT (إخراج وصرف مع الرقابة الصارمة لمنع الرصيد السالب) -->
+  <!-- =================================================================== -->
+  <div id="stockOutModal" class="modal-overlay hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden animate-scale-up">
+      
+      <div class="bg-stockout text-white px-5 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <i class="fa-solid fa-arrow-up-long text-xl"></i>
+          <div>
+            <h3 class="font-bold text-base leading-tight">إذن صرف وتشغيل من المخزن</h3>
+            <p class="text-xs text-red-100">مع الرقابة الصارمة لمنع الصرف السالب</p>
+          </div>
+        </div>
+        <button onclick="closeModal('stockOutModal')" class="text-white/80 hover:text-white p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="stockOutForm" onsubmit="handleStockOutSubmit(event)" class="p-5 space-y-3.5 text-xs">
+        
+        <!-- Cut Selection with Live Available Balance Badge -->
+        <div>
+          <label class="block font-bold text-gray-700 mb-1">اختر القصة المراد الصرف منها *</label>
+          <select id="outCutNumberSelect" required onchange="handleOutCutSelected()" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 font-bold text-sm focus:ring-2 focus:ring-stockout focus:outline-none">
+            <option value="">-- اختر القصة --</option>
+          </select>
+        </div>
+
+        <!-- Available Balance Info Banner -->
+        <div id="outCutBalanceBanner" class="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center justify-between">
+          <div>
+            <span class="text-xs text-amber-800 font-bold block">الرصيد الدفتري المتاح حالياً بالمخزن:</span>
+            <span id="outAvailablePiecesText" class="text-lg font-black text-amber-900">0 قطعة</span>
+            <span id="outAvailableRollsText" class="text-xs text-amber-700 mr-2">(0 ثوب)</span>
+          </div>
+          <div class="text-left">
+            <span id="outModelNameBadge" class="inline-block bg-white text-gray-700 font-bold px-2.5 py-1 rounded text-xs shadow-sm border border-amber-200">-</span>
+          </div>
+        </div>
+
+        <!-- STRICT NEGATIVE BALANCE WARNING BANNER -->
+        <div id="outErrorBanner" class="hidden bg-red-100 border-2 border-red-500 rounded-xl p-3 text-red-800 flex items-start gap-2.5">
+          <i class="fa-solid fa-triangle-exclamation text-lg text-red-600 mt-0.5 animate-bounce"></i>
+          <div>
+            <strong class="block font-black text-xs">تنبيه رقابي: لا يمكن إتمام عملية الصرف!</strong>
+            <p id="outErrorMessage" class="text-xs mt-0.5">الكمية المطلوبة أكبر من الرصيد الدفتري المتاح حالياً لهذه القصة.</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3 bg-red-50/60 p-3 rounded-xl border border-red-200">
+          <div>
+            <label class="block font-bold text-red-900 mb-1">القطع المنصرفة *</label>
+            <input type="number" id="outPieces" required min="1" placeholder="0" class="w-full bg-white border border-red-300 rounded-lg p-2 font-black text-sm text-red-800 focus:ring-2 focus:ring-stockout focus:outline-none" oninput="validateOutgoingBalance()">
+          </div>
+          <div>
+            <label class="block font-bold text-red-900 mb-1">الأثواب / الرولات</label>
+            <input type="number" id="outRolls" min="0" placeholder="0" class="w-full bg-white border border-red-300 rounded-lg p-2 font-bold text-sm focus:ring-2 focus:ring-stockout focus:outline-none" oninput="validateOutgoingBalance()">
+          </div>
+          <div>
+            <label class="block font-bold text-red-900 mb-1">الوزن (كجم)</label>
+            <input type="number" id="outWeight" step="0.1" min="0" placeholder="0.0" class="w-full bg-white border border-red-300 rounded-lg p-2 font-bold text-sm focus:ring-2 focus:ring-stockout focus:outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">الجهة / الورشة المنصرف لها *</label>
+            <input type="text" id="outParty" required placeholder="مثال: ورشة الأمل للخياطة" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 font-semibold focus:ring-2 focus:ring-stockout focus:outline-none">
+          </div>
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">المرحلة الإنتاجية *</label>
+            <select id="outStage" required class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 font-bold text-gray-700 focus:ring-2 focus:ring-stockout focus:outline-none">
+              <option value="خياطة">خياطة</option>
+              <option value="طباعة">طباعة</option>
+              <option value="تطريز">تطريز</option>
+              <option value="تجهيز">تجهيز</option>
+              <option value="تشطيب">تشطيب</option>
+              <option value="قص">قص</option>
+              <option value="أخرى">أخرى</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">اسم المستلم</label>
+            <input type="text" id="outReceiver" placeholder="مثال: أ/ محمد خليل" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-stockout focus:outline-none">
+          </div>
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">أمين المخزن (المُسلّم)</label>
+            <input type="text" id="outStorekeeper" value="أمين المستودع الرئيسي" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-stockout focus:outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">التاريخ *</label>
+            <input type="date" id="outDate" required class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 font-semibold focus:ring-2 focus:ring-stockout focus:outline-none">
+          </div>
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">رقم إذن الصرف</label>
+            <input type="text" id="outDocNumber" placeholder="مثال: OUT-2025-01" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-stockout focus:outline-none">
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-gray-700 mb-1">ملاحظات الصرف</label>
+          <input type="text" id="outNotes" placeholder="أي تفاصيل خاصة بتشغيل هذه الدفعة..." class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-stockout focus:outline-none">
+        </div>
+
+        <div class="pt-3 border-t border-gray-200 flex justify-end gap-2">
+          <button type="button" onclick="closeModal('stockOutModal')" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg transition">إلغاء</button>
+          <button type="submit" id="confirmStockOutBtn" class="px-5 py-2 bg-stockout hover:bg-red-700 text-white font-bold rounded-lg shadow transition flex items-center gap-1.5">
+            <i class="fa-solid fa-check"></i>
+            <span>تأكيد إذن الصرف</span>
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- MODAL 3: ADD/EDIT CUT (إضافة / تعديل قصة) -->
+  <!-- =================================================================== -->
+  <div id="addCutModal" class="modal-overlay hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-scale-up">
+      
+      <div class="bg-excel-600 text-white px-5 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-folder-plus text-xl"></i>
+          <h3 id="cutModalTitle" class="font-bold text-base">تسجيل كود قصة جديدة</h3>
+        </div>
+        <button onclick="closeModal('addCutModal')" class="text-white/80 hover:text-white p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="addCutForm" onsubmit="handleAddCutSubmit(event)" class="p-5 space-y-3.5 text-xs">
+        <input type="hidden" id="editCutOriginalNumber" value="">
+
+        <div>
+          <label class="block font-bold text-gray-700 mb-1">رقم / كود القصة *</label>
+          <input type="text" id="cutNumberInput" required placeholder="مثال: CUT-105" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 font-bold focus:ring-2 focus:ring-excel-600 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block font-bold text-gray-700 mb-1">اسم الموديل *</label>
+          <input type="text" id="cutModelInput" required placeholder="مثال: فستان سهرة صيفي" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 font-semibold focus:ring-2 focus:ring-excel-600 focus:outline-none">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">نوع القماش</label>
+            <input type="text" id="cutFabricInput" placeholder="مثال: شيفون تركي" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-excel-600 focus:outline-none">
+          </div>
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">اللون</label>
+            <input type="text" id="cutColorInput" placeholder="مثال: كحلي" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-excel-600 focus:outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">الموسم</label>
+            <input type="text" id="cutSeasonInput" value="صيف 2025" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-excel-600 focus:outline-none">
+          </div>
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">الكمية المستهدفة (قطع)</label>
+            <input type="number" id="cutTargetPiecesInput" min="0" placeholder="0" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 font-bold focus:ring-2 focus:ring-excel-600 focus:outline-none">
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-gray-700 mb-1">ملاحظات القصة</label>
+          <input type="text" id="cutNotesInput" placeholder="أي تفاصيل خاصة بالقصة..." class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-excel-600 focus:outline-none">
+        </div>
+
+        <div class="pt-3 border-t border-gray-200 flex justify-end gap-2">
+          <button type="button" onclick="closeModal('addCutModal')" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg transition">إلغاء</button>
+          <button type="submit" class="px-5 py-2 bg-excel-600 hover:bg-excel-700 text-white font-bold rounded-lg shadow transition">حفظ القصة</button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- MODAL 4: IMPORT PREVIEW & AUDIT (نافذة تدقيق وفحص ملف الإكسل قبل الحفظ) -->
+  <!-- =================================================================== -->
+  <div id="importAuditModal" class="modal-overlay hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full overflow-hidden animate-scale-up">
+      
+      <div class="bg-excel-700 text-white px-5 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <i class="fa-solid fa-file-shield text-xl"></i>
+          <div>
+            <h3 class="font-bold text-base leading-tight">تدقيق ومعاينة ملف Excel قبل الاستيراد</h3>
+            <p class="text-xs text-excel-200">فحص سلامة الصفوف والأعمدة قبل دمجها بقاعدة البيانات</p>
+          </div>
+        </div>
+        <button onclick="closeModal('importAuditModal')" class="text-white/80 hover:text-white p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="p-5 space-y-4 text-xs">
+        
+        <!-- Summary Counters -->
+        <div class="grid grid-cols-3 gap-3">
+          <div class="bg-blue-50 border border-blue-200 p-3 rounded-lg text-center">
+            <span class="text-gray-500 block text-xs">إجمالي الصفوف المقروءة</span>
+            <span id="importTotalRowsCount" class="text-xl font-bold text-blue-700">0</span>
+          </div>
+          <div class="bg-green-50 border border-green-200 p-3 rounded-lg text-center">
+            <span class="text-gray-500 block text-xs">صفوف سليمة ومطابقة</span>
+            <span id="importValidRowsCount" class="text-xl font-bold text-green-700">0</span>
+          </div>
+          <div class="bg-red-50 border border-red-200 p-3 rounded-lg text-center">
+            <span class="text-gray-500 block text-xs">صفوف بها أخطاء أو فارغة</span>
+            <span id="importInvalidRowsCount" class="text-xl font-bold text-red-700">0</span>
+          </div>
+        </div>
+
+        <!-- Table Preview -->
+        <div class="border border-gray-300 rounded-lg overflow-hidden max-h-60 overflow-y-auto">
+          <table class="w-full text-right text-xs">
+            <thead class="bg-gray-100 text-gray-700 font-bold sticky top-0">
+              <tr>
+                <th class="p-2">#</th>
+                <th class="p-2">القصة</th>
+                <th class="p-2">الموديل</th>
+                <th class="p-2">النوع</th>
+                <th class="p-2">القطع</th>
+                <th class="p-2">الجهة</th>
+                <th class="p-2">الحالة</th>
+              </tr>
+            </thead>
+            <tbody id="importPreviewTableBody" class="divide-y divide-gray-200">
+              <!-- Injected via JS -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="pt-3 border-t border-gray-200 flex justify-between items-center">
+          <span class="text-gray-500 text-xs">سيتم تخطي الصفوف غير السليمة واستيراد الصفوف المطابقة فقط</span>
+          <div class="flex gap-2">
+            <button type="button" onclick="closeModal('importAuditModal')" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg transition">إلغاء</button>
+            <button type="button" onclick="commitExcelImport()" id="commitImportBtn" class="px-5 py-2 bg-excel-600 hover:bg-excel-700 text-white font-bold rounded-lg shadow transition flex items-center gap-1.5">
+              <i class="fa-solid fa-cloud-arrow-up"></i>
+              <span>تأكيد واستيراد البيانات</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
