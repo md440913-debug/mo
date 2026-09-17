@@ -1,6 +1,6 @@
 {
   "name": "مخازن القصات إكسل",
-  "description": "نظام متكامل وديناميكي لإدارة مخازن وقصات الملابس مع مزامنة سحابية Firebase وحماية آمنة بكلمة مرور (010019).",
+  "description": "نظام متكامل وديناميكي لإدارة مخازن وقصات الملابس مع مزامنة سحابية Firebase وحماية آمنة بكلمة مرور.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

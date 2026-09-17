@@ -70,7 +70,7 @@
         </div>
         <div class="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-[11px] font-bold tracking-wide">
           <i class="fa-solid fa-shield-halved"></i>
-          <span>نظام مشفر ومحمي • كلمة المرور: 010019</span>
+          <span>نظام مشفر ومحمي • بوابة أمنية</span>
         </div>
       </div>
 
@@ -135,7 +135,7 @@
       <div class="pt-1 text-[11px] text-gray-400 flex items-center justify-center gap-2">
         <span>ERP Enterprise Warehouse System</span>
         <span>•</span>
-        <span class="text-emerald-400 font-mono font-bold">PASS: 010019</span>
+        <span class="text-emerald-400/80 font-medium">سحابي ومحمي</span>
       </div>
 
     </div>
@@ -170,7 +170,7 @@
         <i class="fa-solid fa-minus"></i>
         <span>صرف</span>
       </button>
-      <button onclick="lockSystem()" class="bg-excel-700 hover:bg-red-600 text-white text-xs font-bold p-1.5 rounded flex items-center justify-center shadow transition" title="قفل النظام (010019)">
+      <button onclick="lockSystem()" class="bg-excel-700 hover:bg-red-600 text-white text-xs font-bold p-1.5 rounded flex items-center justify-center shadow transition" title="قفل النظام">
         <i class="fa-solid fa-lock"></i>
       </button>
     </div>
@@ -273,7 +273,7 @@
       <div class="pt-2 border-t border-gray-200">
         <button onclick="lockSystem()" class="w-full text-center py-2 px-3 rounded-lg text-xs font-bold text-red-600 hover:bg-red-50 hover:text-red-700 border border-red-200 transition flex items-center justify-center gap-1.5 shadow-2xs">
           <i class="fa-solid fa-lock"></i>
-          <span>قفل النظام (010019)</span>
+          <span>قفل النظام</span>
         </button>
       </div>
       <div class="text-[11px] text-gray-400 text-center pt-1">
@@ -1000,12 +1000,11 @@
                   <span>حالة الحماية:</span>
                   <span class="text-xs font-bold px-2 py-0.5 rounded bg-emerald-200/80 text-emerald-900 flex items-center gap-1">
                     <i class="fa-solid fa-lock text-[10px]"></i>
-                    <span>مفعلة</span>
+                    <span>مفعلة ومشفرة</span>
                   </span>
                 </div>
-                <div class="flex items-center justify-between text-[11px] text-emerald-800">
-                  <span>كلمة المرور الافتراضية:</span>
-                  <strong class="font-mono bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-300">010019</strong>
+                <div class="text-[11px] text-emerald-800">
+                  <span>النظام محمي بكلمة مرور ومقفل للمصرح لهم فقط.</span>
                 </div>
               </div>
 
@@ -1835,15 +1834,14 @@
         <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-900 space-y-1">
           <div class="font-bold flex items-center gap-1.5 text-xs">
             <i class="fa-solid fa-shield-halved text-emerald-600"></i>
-            <span>كلمة المرور الافتراضية للنظام:</span>
-            <span class="font-mono bg-emerald-200/80 px-2 py-0.5 rounded text-xs font-black">010019</span>
+            <span>حماية وأمان النظام</span>
           </div>
-          <p class="text-[11px] text-emerald-700">يمكنك الإبقاء عليها أو تخصيص كلمة مرور جديدة حسب رغبتك.</p>
+          <p class="text-[11px] text-emerald-700">يمكنك تعديل كلمة المرور أو استعادة الرمز الافتراضي في أي وقت.</p>
         </div>
 
         <div>
           <label class="block font-bold text-gray-700 mb-1">كلمة المرور الحالية: <span class="text-red-500">*</span></label>
-          <input type="password" id="currentPwdInput" required placeholder="أدخل كلمة المرور الحالية (010019)" class="w-full text-xs bg-gray-50 border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+          <input type="password" id="currentPwdInput" required placeholder="أدخل كلمة المرور الحالية" class="w-full text-xs bg-gray-50 border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
         </div>
 
         <div>
@@ -1861,7 +1859,7 @@
         <div class="pt-3 border-t border-gray-200 flex flex-wrap justify-between items-center gap-2">
           <button type="button" onclick="resetPasswordToDefault()" class="text-xs text-gray-500 hover:text-red-600 hover:underline flex items-center gap-1 font-bold">
             <i class="fa-solid fa-rotate-left"></i>
-            <span>استعادة الرمز الافتراضي (010019)</span>
+            <span>استعادة الرمز الافتراضي</span>
           </button>
           <div class="flex gap-2">
             <button type="button" onclick="closeModal('changePasswordModal')" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg transition">إلغاء</button>

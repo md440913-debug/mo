@@ -2824,9 +2824,9 @@ function handleChangePasswordSubmit(e) {
 }
 
 function resetPasswordToDefault() {
-  if (confirm('هل أنت متأكد من رغبتك في استعادة كلمة المرور الافتراضية (010019)؟')) {
+  if (confirm('هل أنت متأكد من رغبتك في استعادة كلمة المرور الافتراضية للنظام؟')) {
     localStorage.removeItem(PASSWORD_STORAGE_KEY);
-    showToast('تمت استعادة كلمة المرور الافتراضية بنجاح: 010019', 'success');
+    showToast('تمت استعادة كلمة المرور الافتراضية بنجاح', 'success');
     closeModal('changePasswordModal');
   }
 }
