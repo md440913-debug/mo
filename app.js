@@ -2630,10 +2630,215 @@ function closeMobileSidebar() {
 }
 
 // ==========================================
+// 13.5. SECURITY & AUTHENTICATION (010019)
+// ==========================================
+
+const AUTH_SESSION_KEY = 'EXCEL_CUTS_AUTH_SESSION_V1';
+const PASSWORD_STORAGE_KEY = 'EXCEL_CUTS_SYSTEM_PWD_V1';
+const DEFAULT_SYSTEM_PASSWORD = '010019'; // Requested password
+
+function getSystemPassword() {
+  return localStorage.getItem(PASSWORD_STORAGE_KEY) || DEFAULT_SYSTEM_PASSWORD;
+}
+
+function isSystemUnlocked() {
+  return sessionStorage.getItem(AUTH_SESSION_KEY) === 'unlocked';
+}
+
+function initAuthSystem() {
+  const lockScreen = document.getElementById('authLockScreen');
+  const input = document.getElementById('authPasswordInput');
+  const errorEl = document.getElementById('authErrorMsg');
+
+  if (isSystemUnlocked()) {
+    if (lockScreen) lockScreen.classList.add('hidden');
+  } else {
+    if (lockScreen) {
+      lockScreen.classList.remove('hidden');
+      if (errorEl) errorEl.classList.add('hidden');
+      if (input) {
+        input.value = '';
+        setTimeout(() => input.focus(), 250);
+      }
+    }
+  }
+}
+
+function handleAuthSubmit(e) {
+  if (e) e.preventDefault();
+  const input = document.getElementById('authPasswordInput');
+  const errorEl = document.getElementById('authErrorMsg');
+  const errorText = document.getElementById('authErrorText');
+  const lockIcon = document.getElementById('lockScreenIcon');
+  const lockScreen = document.getElementById('authLockScreen');
+
+  const entered = input ? input.value.trim() : '';
+  const currentPassword = getSystemPassword();
+
+  if (entered === currentPassword) {
+    // Authentication successful
+    if (errorEl) errorEl.classList.add('hidden');
+    if (lockIcon) {
+      lockIcon.className = 'fa-solid fa-lock-open text-emerald-400';
+    }
+    sessionStorage.setItem(AUTH_SESSION_KEY, 'unlocked');
+    showToast('تم التحقق من كلمة المرور بنجاح، مرحباً بك!', 'success');
+
+    // Smooth unlock animation
+    if (lockScreen) {
+      lockScreen.classList.add('opacity-0', 'transition-opacity', 'duration-300');
+      setTimeout(() => {
+        lockScreen.classList.add('hidden');
+        lockScreen.classList.remove('opacity-0', 'transition-opacity', 'duration-300');
+        if (lockIcon) lockIcon.className = 'fa-solid fa-lock';
+      }, 300);
+    }
+  } else {
+    // Authentication failed
+    if (errorEl) {
+      errorEl.classList.remove('hidden');
+      if (errorText) errorText.textContent = 'كلمة المرور غير صحيحة، يرجى المحاولة مرة أخرى!';
+      errorEl.classList.remove('animate-shake');
+      void errorEl.offsetWidth; // force DOM reflow
+      errorEl.classList.add('animate-shake');
+    }
+    if (input) {
+      input.classList.add('border-red-500', 'ring-4', 'ring-red-500/30');
+      input.value = '';
+      input.focus();
+      setTimeout(() => {
+        input.classList.remove('border-red-500', 'ring-4', 'ring-red-500/30');
+      }, 1500);
+    }
+  }
+}
+
+function lockSystem() {
+  sessionStorage.removeItem(AUTH_SESSION_KEY);
+  const lockScreen = document.getElementById('authLockScreen');
+  const input = document.getElementById('authPasswordInput');
+  const errorEl = document.getElementById('authErrorMsg');
+
+  if (errorEl) errorEl.classList.add('hidden');
+  if (input) input.value = '';
+  
+  if (lockScreen) {
+    lockScreen.classList.remove('hidden');
+    setTimeout(() => {
+      if (input) input.focus();
+    }, 200);
+  }
+  showToast('تم قفل النظام بنجاح', 'info');
+}
+
+function keypadPress(digit) {
+  const input = document.getElementById('authPasswordInput');
+  if (input) {
+    input.value += digit;
+    input.focus();
+  }
+}
+
+function keypadClear() {
+  const input = document.getElementById('authPasswordInput');
+  if (input) {
+    input.value = '';
+    input.focus();
+  }
+}
+
+function keypadBackspace() {
+  const input = document.getElementById('authPasswordInput');
+  if (input) {
+    input.value = input.value.slice(0, -1);
+    input.focus();
+  }
+}
+
+function toggleAuthPasswordVisibility() {
+  const input = document.getElementById('authPasswordInput');
+  const icon = document.getElementById('authEyeIcon');
+  if (!input || !icon) return;
+
+  if (input.type === 'password') {
+    input.type = 'text';
+    icon.className = 'fa-solid fa-eye-slash';
+  } else {
+    input.type = 'password';
+    icon.className = 'fa-solid fa-eye';
+  }
+}
+
+function handleChangePasswordSubmit(e) {
+  if (e) e.preventDefault();
+  const currentInput = document.getElementById('currentPwdInput');
+  const newInput = document.getElementById('newPwdInput');
+  const confirmInput = document.getElementById('confirmNewPwdInput');
+  const msgEl = document.getElementById('changePwdMsg');
+
+  const currentEntered = currentInput ? currentInput.value.trim() : '';
+  const newEntered = newInput ? newInput.value.trim() : '';
+  const confirmEntered = confirmInput ? confirmInput.value.trim() : '';
+
+  const activePassword = getSystemPassword();
+
+  if (currentEntered !== activePassword) {
+    if (msgEl) {
+      msgEl.className = 'p-2.5 rounded-lg text-xs font-bold text-center bg-red-100 text-red-700 border border-red-200 block';
+      msgEl.textContent = 'كلمة المرور الحالية غير صحيحة!';
+    }
+    return;
+  }
+
+  if (!newEntered) {
+    if (msgEl) {
+      msgEl.className = 'p-2.5 rounded-lg text-xs font-bold text-center bg-red-100 text-red-700 border border-red-200 block';
+      msgEl.textContent = 'يرجى إدخال كلمة مرور جديدة!';
+    }
+    return;
+  }
+
+  if (newEntered !== confirmEntered) {
+    if (msgEl) {
+      msgEl.className = 'p-2.5 rounded-lg text-xs font-bold text-center bg-red-100 text-red-700 border border-red-200 block';
+      msgEl.textContent = 'كلمتا المرور الجديدة غير متطابقتين!';
+    }
+    return;
+  }
+
+  // Save new password
+  localStorage.setItem(PASSWORD_STORAGE_KEY, newEntered);
+  if (msgEl) {
+    msgEl.className = 'p-2.5 rounded-lg text-xs font-bold text-center bg-green-100 text-green-700 border border-green-200 block';
+    msgEl.textContent = 'تم تغيير كلمة المرور بنجاح!';
+  }
+  showToast('تم تحديث كلمة المرور بنجاح!', 'success');
+
+  setTimeout(() => {
+    closeModal('changePasswordModal');
+    if (currentInput) currentInput.value = '';
+    if (newInput) newInput.value = '';
+    if (confirmInput) confirmInput.value = '';
+    if (msgEl) msgEl.className = 'hidden';
+  }, 1200);
+}
+
+function resetPasswordToDefault() {
+  if (confirm('هل أنت متأكد من رغبتك في استعادة كلمة المرور الافتراضية (010019)؟')) {
+    localStorage.removeItem(PASSWORD_STORAGE_KEY);
+    showToast('تمت استعادة كلمة المرور الافتراضية بنجاح: 010019', 'success');
+    closeModal('changePasswordModal');
+  }
+}
+
+// ==========================================
 // 14. APP BOOTSTRAP
 // ==========================================
 
 window.addEventListener('DOMContentLoaded', () => {
+  // Init Security & Authentication immediately
+  initAuthSystem();
+
   // Set live date
   const dateEl = document.getElementById('headerLiveDate');
   if (dateEl) {

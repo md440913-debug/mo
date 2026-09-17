@@ -45,9 +45,101 @@
   <!-- Font Awesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
+  <!-- Firebase Compat App & Realtime Database SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="bg-gray-100 text-gray-800 font-cairo antialiased min-h-screen flex flex-col md:flex-row overflow-x-hidden">
+
+  <!-- ======================== SECURITY AUTH LOCK SCREEN (010019) ======================== -->
+  <div id="authLockScreen" class="fixed inset-0 z-[99999] bg-gradient-to-br from-gray-950 via-excel-950 to-gray-900 flex items-center justify-center p-4 overflow-y-auto">
+    <div class="max-w-md w-full bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-6 md:p-8 shadow-2xl text-white text-center space-y-6 animate-scale-up relative overflow-hidden my-auto">
+      
+      <!-- Ambient Glow Accents -->
+      <div class="absolute -top-20 -left-20 w-44 h-44 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="absolute -bottom-20 -right-20 w-44 h-44 bg-excel-500/20 rounded-full blur-3xl pointer-events-none"></div>
+
+      <!-- Security Shield & App Icon -->
+      <div class="relative">
+        <div class="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-tr from-excel-600 to-emerald-400 p-0.5 shadow-xl shadow-emerald-950/60">
+          <div class="w-full h-full bg-gray-900/80 backdrop-blur rounded-2xl flex items-center justify-center text-3xl text-emerald-400">
+            <i id="lockScreenIcon" class="fa-solid fa-lock"></i>
+          </div>
+        </div>
+        <div class="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-[11px] font-bold tracking-wide">
+          <i class="fa-solid fa-shield-halved"></i>
+          <span>نظام مشفر ومحمي • كلمة المرور: 010019</span>
+        </div>
+      </div>
+
+      <!-- Titles -->
+      <div class="space-y-1">
+        <h2 class="text-xl md:text-2xl font-black text-white tracking-wide">مخازن القصات إكسل</h2>
+        <p class="text-xs text-gray-300 leading-relaxed">أدخل كلمة المرور للوصول إلى قاعدة بيانات وأرصدة المستودع</p>
+      </div>
+
+      <!-- Password Form -->
+      <form id="authLockForm" onsubmit="handleAuthSubmit(event)" class="space-y-4">
+        <div class="relative">
+          <input 
+            type="password" 
+            id="authPasswordInput" 
+            autocomplete="current-password"
+            placeholder="كلمة المرور..." 
+            dir="ltr"
+            class="w-full bg-gray-950/70 border-2 border-white/20 focus:border-emerald-400 text-white placeholder-gray-500 text-center font-mono font-bold tracking-widest text-xl rounded-2xl py-3.5 px-12 focus:ring-4 focus:ring-emerald-500/20 focus:outline-none transition shadow-inner"
+          >
+          <button 
+            type="button" 
+            onclick="toggleAuthPasswordVisibility()" 
+            class="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition p-1.5 text-sm"
+            title="إظهار / إخفاء كلمة المرور">
+            <i id="authEyeIcon" class="fa-solid fa-eye"></i>
+          </button>
+        </div>
+
+        <!-- Quick Numeric Keypad for fast touch input -->
+        <div class="grid grid-cols-3 gap-2 pt-1 text-base font-bold font-mono">
+          <button type="button" onclick="keypadPress('1')" class="py-2.5 bg-white/5 hover:bg-white/15 active:bg-emerald-600/50 rounded-xl border border-white/10 transition shadow-xs">1</button>
+          <button type="button" onclick="keypadPress('2')" class="py-2.5 bg-white/5 hover:bg-white/15 active:bg-emerald-600/50 rounded-xl border border-white/10 transition shadow-xs">2</button>
+          <button type="button" onclick="keypadPress('3')" class="py-2.5 bg-white/5 hover:bg-white/15 active:bg-emerald-600/50 rounded-xl border border-white/10 transition shadow-xs">3</button>
+          <button type="button" onclick="keypadPress('4')" class="py-2.5 bg-white/5 hover:bg-white/15 active:bg-emerald-600/50 rounded-xl border border-white/10 transition shadow-xs">4</button>
+          <button type="button" onclick="keypadPress('5')" class="py-2.5 bg-white/5 hover:bg-white/15 active:bg-emerald-600/50 rounded-xl border border-white/10 transition shadow-xs">5</button>
+          <button type="button" onclick="keypadPress('6')" class="py-2.5 bg-white/5 hover:bg-white/15 active:bg-emerald-600/50 rounded-xl border border-white/10 transition shadow-xs">6</button>
+          <button type="button" onclick="keypadPress('7')" class="py-2.5 bg-white/5 hover:bg-white/15 active:bg-emerald-600/50 rounded-xl border border-white/10 transition shadow-xs">7</button>
+          <button type="button" onclick="keypadPress('8')" class="py-2.5 bg-white/5 hover:bg-white/15 active:bg-emerald-600/50 rounded-xl border border-white/10 transition shadow-xs">8</button>
+          <button type="button" onclick="keypadPress('9')" class="py-2.5 bg-white/5 hover:bg-white/15 active:bg-emerald-600/50 rounded-xl border border-white/10 transition shadow-xs">9</button>
+          <button type="button" onclick="keypadClear()" class="py-2.5 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-xl border border-red-500/30 transition text-xs font-sans font-bold">مسح C</button>
+          <button type="button" onclick="keypadPress('0')" class="py-2.5 bg-white/5 hover:bg-white/15 active:bg-emerald-600/50 rounded-xl border border-white/10 transition shadow-xs">0</button>
+          <button type="button" onclick="keypadBackspace()" class="py-2.5 bg-white/5 hover:bg-white/15 active:bg-emerald-600/50 rounded-xl border border-white/10 transition shadow-xs" title="مسح رقم"><i class="fa-solid fa-delete-left"></i></button>
+        </div>
+
+        <!-- Error Message Banner -->
+        <div id="authErrorMsg" class="hidden p-3 rounded-xl bg-red-500/25 border border-red-500/40 text-red-200 text-xs font-bold flex items-center justify-center gap-2 animate-shake">
+          <i class="fa-solid fa-circle-exclamation text-red-300 text-sm"></i>
+          <span id="authErrorText">كلمة المرور غير صحيحة، يرجى المحاولة مرة أخرى!</span>
+        </div>
+
+        <!-- Submit Button -->
+        <button 
+          type="submit" 
+          id="authSubmitBtn"
+          class="w-full bg-gradient-to-r from-emerald-600 to-excel-600 hover:from-emerald-500 hover:to-excel-500 text-white font-extrabold py-3.5 px-6 rounded-2xl shadow-lg shadow-emerald-950/60 transition flex items-center justify-center gap-2 text-sm active:scale-[0.98]">
+          <i class="fa-solid fa-lock-open"></i>
+          <span>فتح النظام وتسجيل الدخول</span>
+        </button>
+      </form>
+
+      <div class="pt-1 text-[11px] text-gray-400 flex items-center justify-center gap-2">
+        <span>ERP Enterprise Warehouse System</span>
+        <span>•</span>
+        <span class="text-emerald-400 font-mono font-bold">PASS: 010019</span>
+      </div>
+
+    </div>
+  </div>
 
   <!-- ======================== TOAST NOTIFICATION CONTAINER ======================== -->
   <div id="toastContainer" class="fixed top-5 left-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
@@ -77,6 +169,9 @@
       <button onclick="openModal('stockOutModal')" class="bg-stockout hover:bg-red-700 text-white text-xs font-bold px-2.5 py-1.5 rounded flex items-center gap-1 shadow">
         <i class="fa-solid fa-minus"></i>
         <span>صرف</span>
+      </button>
+      <button onclick="lockSystem()" class="bg-excel-700 hover:bg-red-600 text-white text-xs font-bold p-1.5 rounded flex items-center justify-center shadow transition" title="قفل النظام (010019)">
+        <i class="fa-solid fa-lock"></i>
       </button>
     </div>
   </header>
@@ -175,8 +270,14 @@
           <span>تحميل شيت Excel</span>
         </button>
       </div>
-      <div class="text-[11px] text-gray-400 text-center pt-1 border-t border-gray-200">
-        نظام ويب متجاوب • تخزين محلي آمن
+      <div class="pt-2 border-t border-gray-200">
+        <button onclick="lockSystem()" class="w-full text-center py-2 px-3 rounded-lg text-xs font-bold text-red-600 hover:bg-red-50 hover:text-red-700 border border-red-200 transition flex items-center justify-center gap-1.5 shadow-2xs">
+          <i class="fa-solid fa-lock"></i>
+          <span>قفل النظام (010019)</span>
+        </button>
+      </div>
+      <div class="text-[11px] text-gray-400 text-center pt-1">
+        نظام ويب متجاوب • محمي بكلمة مرور
       </div>
     </div>
   </aside>
@@ -198,14 +299,22 @@
         <div class="text-xs text-gray-500 flex items-center gap-2">
           <span>التاريخ: <strong id="headerLiveDate" class="text-gray-700"></strong></span>
           <span>•</span>
-          <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-green-100 text-green-800">
-            <i class="fa-solid fa-circle-check ml-1 text-green-600"></i>
-            متصل بالنظام
+          <span id="firebaseStatusBadge" onclick="openFirebaseSettingsModal()" class="cursor-pointer inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition" title="انقر لإعدادات الربط السحابي مع زميلك">
+            <span id="firebaseStatusDot" class="w-2 h-2 rounded-full bg-amber-500 ml-1.5"></span>
+            <span id="firebaseStatusText">محلي (غير متصل بـ Firebase)</span>
           </span>
         </div>
       </div>
 
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2">
+        <button onclick="lockSystem()" class="bg-gray-100 hover:bg-red-50 hover:text-red-700 text-gray-700 text-xs font-bold px-3 py-2 rounded-lg border border-gray-200 flex items-center gap-1.5 transition" title="قفل النظام وشاشة الحماية">
+          <i class="fa-solid fa-lock text-sm text-gray-500"></i>
+          <span>قفل النظام</span>
+        </button>
+        <button onclick="openFirebaseSettingsModal()" class="bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold px-3 py-2 rounded-lg border border-amber-300 flex items-center gap-1.5 transition" title="إعدادات المزامنة السحابية">
+          <i class="fa-solid fa-fire-flame-curved text-amber-600 text-sm"></i>
+          <span>ربط Firebase</span>
+        </button>
         <button onclick="openModal('stockInModal')" class="bg-stockin hover:bg-green-700 text-white text-xs font-bold px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow transition">
           <i class="fa-solid fa-plus"></i>
           <span>+ وارد جديد</span>
@@ -218,9 +327,9 @@
           <i class="fa-solid fa-file-excel"></i>
           <span>تصدير Excel</span>
         </button>
-        <button onclick="openModal('addCutModal')" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold px-3.5 py-2 rounded-lg border border-gray-300 flex items-center gap-1.5 transition">
-          <i class="fa-solid fa-folder-plus text-excel-600"></i>
-          <span>+ كود قصة</span>
+        <button onclick="openModal('addCutModal')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow transition">
+          <i class="fa-solid fa-folder-plus"></i>
+          <span>+ كود قصة جديدة</span>
         </button>
       </div>
     </div>
@@ -870,8 +979,82 @@
           <p class="text-xs text-gray-500">حفظ ونقل البيانات واستيراد ملفات الإكسل مع الفحص والتدقيق الآلي</p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           
+          <!-- System Security & Password Protection Card -->
+          <div class="bg-white p-5 rounded-xl shadow-sm border-2 border-emerald-200 space-y-4 relative overflow-hidden">
+            <div class="absolute -top-3 -left-3 bg-emerald-600 text-white text-[10px] font-bold px-4 py-1 rotate-[-15deg] shadow">أمان ومحمي</div>
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-shield-halved"></i>
+              </div>
+              <div>
+                <h3 class="font-bold text-sm text-gray-800">حماية النظام بكلمة مرور</h3>
+                <p class="text-xs text-gray-500">حماية بيانات المخزن ومنع الوصول غير المصرح به</p>
+              </div>
+            </div>
+
+            <div class="space-y-3 pt-2">
+              <div class="p-3 bg-emerald-50 rounded-lg text-xs space-y-1.5 border border-emerald-200">
+                <div class="flex items-center justify-between font-bold text-emerald-900">
+                  <span>حالة الحماية:</span>
+                  <span class="text-xs font-bold px-2 py-0.5 rounded bg-emerald-200/80 text-emerald-900 flex items-center gap-1">
+                    <i class="fa-solid fa-lock text-[10px]"></i>
+                    <span>مفعلة</span>
+                  </span>
+                </div>
+                <div class="flex items-center justify-between text-[11px] text-emerald-800">
+                  <span>كلمة المرور الافتراضية:</span>
+                  <strong class="font-mono bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-300">010019</strong>
+                </div>
+              </div>
+
+              <button onclick="lockSystem()" class="w-full bg-gray-900 hover:bg-black text-white font-bold py-2.5 px-4 rounded-lg text-xs flex items-center justify-center gap-2 shadow transition">
+                <i class="fa-solid fa-lock"></i>
+                <span>قفل شاشة النظام الآن</span>
+              </button>
+
+              <button onclick="openModal('changePasswordModal')" class="w-full bg-white hover:bg-emerald-50 text-emerald-800 font-bold py-2 px-3 rounded-lg text-xs border border-emerald-300 transition flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-key"></i>
+                <span>تغيير كلمة المرور أو إعادة ضبطها</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Firebase Realtime Database Card -->
+          <div class="bg-white p-5 rounded-xl shadow-sm border-2 border-amber-200 space-y-4 relative overflow-hidden">
+            <div class="absolute -top-3 -left-3 bg-amber-500 text-white text-[10px] font-bold px-4 py-1 rotate-[-15deg] shadow">سحابي مباشر</div>
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-fire-flame-curved"></i>
+              </div>
+              <div>
+                <h3 class="font-bold text-sm text-gray-800">الربط والمزامنة السحابية (Firebase)</h3>
+                <p class="text-xs text-gray-500">مزامنة فورية متعددة المستخدمين بدون فقدان أي بيانات</p>
+              </div>
+            </div>
+
+            <div class="space-y-3 pt-2">
+              <div class="p-3 bg-amber-50 rounded-lg text-xs space-y-1.5 border border-amber-200">
+                <div class="flex items-center justify-between font-bold text-amber-900">
+                  <span>حالة المزامنة:</span>
+                  <span id="toolsFirebaseStatusBadge" class="text-xs font-semibold px-2 py-0.5 rounded bg-amber-100 text-amber-800">جاري التحقق...</span>
+                </div>
+                <p class="text-[11px] text-amber-700">عند الربط، يمكنك أنت وزميلك العمل في نفس الوقت وتسجيل البيانات لحظياً من أي جهاز.</p>
+              </div>
+
+              <button onclick="openFirebaseSettingsModal()" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-4 rounded-lg text-xs flex items-center justify-center gap-2 shadow transition">
+                <i class="fa-solid fa-gear"></i>
+                <span>إعدادات مفاتيح Firebase Config</span>
+              </button>
+
+              <button onclick="syncLocalToFirebase()" class="w-full bg-white hover:bg-amber-50 text-amber-800 font-bold py-2 px-3 rounded-lg text-xs border border-amber-300 transition flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+                <span>رفع البيانات الحالية إلى Firebase الآن</span>
+              </button>
+            </div>
+          </div>
+
           <!-- Excel Export & Import Card -->
           <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 space-y-4">
             <div class="flex items-center gap-3">
@@ -1159,64 +1342,283 @@
   </div>
 
   <!-- =================================================================== -->
-  <!-- MODAL 3: ADD/EDIT CUT (إضافة / تعديل قصة) -->
+  <!-- MODAL 3: ADD/EDIT CUT (إضافة / تعديل قصة - ورقة مواصفات قص كاملة وديناميكية) -->
   <!-- =================================================================== -->
-  <div id="addCutModal" class="modal-overlay hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-scale-up">
+  <div id="addCutModal" class="modal-overlay hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 md:p-6 overflow-y-auto">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-scale-up">
       
-      <div class="bg-excel-600 text-white px-5 py-4 flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <i class="fa-solid fa-folder-plus text-xl"></i>
-          <h3 id="cutModalTitle" class="font-bold text-base">تسجيل كود قصة جديدة</h3>
+      <!-- Modal Header -->
+      <div class="bg-gradient-to-l from-excel-700 to-excel-600 text-white px-6 py-4 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-xl shadow-inner">
+            <i class="fa-solid fa-scissors"></i>
+          </div>
+          <div>
+            <h3 id="cutModalTitle" class="font-bold text-base md:text-lg">تسجيل ورقة قص وتشغيل قصة جديدة</h3>
+            <p class="text-xs text-excel-100">تسجيل بيانات الموديل وجداول رولات الأوزان والراقات للبلوزة والبنطلون</p>
+          </div>
         </div>
-        <button onclick="closeModal('addCutModal')" class="text-white/80 hover:text-white p-1">
-          <i class="fa-solid fa-xmark text-lg"></i>
+        <button onclick="closeModal('addCutModal')" class="text-white/80 hover:text-white p-2 hover:bg-white/10 rounded-lg transition" aria-label="إغلاق">
+          <i class="fa-solid fa-xmark text-xl"></i>
         </button>
       </div>
 
-      <form id="addCutForm" onsubmit="handleAddCutSubmit(event)" class="p-5 space-y-3.5 text-xs">
+      <!-- Modal Body (Scrollable Form) -->
+      <form id="addCutForm" onsubmit="handleAddCutSubmit(event)" class="p-5 md:p-6 overflow-y-auto space-y-6 text-xs flex-1">
         <input type="hidden" id="editCutOriginalNumber" value="">
+        <input type="hidden" id="cutImageBase64" value="">
 
-        <div>
-          <label class="block font-bold text-gray-700 mb-1">رقم / كود القصة *</label>
-          <input type="text" id="cutNumberInput" required placeholder="مثال: CUT-105" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 font-bold focus:ring-2 focus:ring-excel-600 focus:outline-none">
-        </div>
+        <!-- SECTION 1: BASIC INFORMATION -->
+        <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3">
+          <h4 class="font-extrabold text-gray-800 text-xs md:text-sm flex items-center gap-2 border-b border-gray-200 pb-2">
+            <i class="fa-solid fa-circle-info text-excel-600"></i>
+            <span>البيانات الأساسية للقصة</span>
+          </h4>
 
-        <div>
-          <label class="block font-bold text-gray-700 mb-1">اسم الموديل *</label>
-          <input type="text" id="cutModelInput" required placeholder="مثال: فستان سهرة صيفي" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 font-semibold focus:ring-2 focus:ring-excel-600 focus:outline-none">
-        </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">رقم / كود القصة *</label>
+              <input type="text" id="cutNumberInput" required placeholder="مثال: CUT-105" class="w-full bg-white border border-gray-300 rounded-lg p-2 font-bold text-gray-800 focus:ring-2 focus:ring-excel-600 focus:outline-none">
+            </div>
 
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block font-bold text-gray-700 mb-1">نوع القماش</label>
-            <input type="text" id="cutFabricInput" placeholder="مثال: شيفون تركي" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-excel-600 focus:outline-none">
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">اسم الموديل *</label>
+              <input type="text" id="cutModelInput" required placeholder="مثال: سوت كتان بنطلون وبلوزة" class="w-full bg-white border border-gray-300 rounded-lg p-2 font-semibold text-gray-800 focus:ring-2 focus:ring-excel-600 focus:outline-none">
+            </div>
+
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">تاريخ القص *</label>
+              <input type="date" id="cutDateInput" required class="w-full bg-white border border-gray-300 rounded-lg p-2 font-semibold text-gray-800 focus:ring-2 focus:ring-excel-600 focus:outline-none">
+            </div>
+
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">مورد القماش / الجهة</label>
+              <input type="text" id="cutSupplierInput" placeholder="مثال: شركة النسيج الحديث" class="w-full bg-white border border-gray-300 rounded-lg p-2 text-gray-800 focus:ring-2 focus:ring-excel-600 focus:outline-none">
+            </div>
           </div>
-          <div>
-            <label class="block font-bold text-gray-700 mb-1">اللون</label>
-            <input type="text" id="cutColorInput" placeholder="مثال: كحلي" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-excel-600 focus:outline-none">
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">إجمالي عدد القطع المقصوصة *</label>
+              <input type="number" id="cutPiecesCountInput" required min="1" placeholder="مثال: 500" class="w-full bg-white border border-gray-300 rounded-lg p-2 font-extrabold text-excel-700 text-sm focus:ring-2 focus:ring-excel-600 focus:outline-none">
+            </div>
+
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">المقاسات (Sizes)</label>
+              <input type="text" id="cutSizesInput" placeholder="مثال: M - L - XL - XXL أو 38-46" class="w-full bg-white border border-gray-300 rounded-lg p-2 text-gray-800 focus:ring-2 focus:ring-excel-600 focus:outline-none">
+            </div>
+
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">نوع القماش والخامة</label>
+              <input type="text" id="cutFabricInput" placeholder="مثال: كتان مخلوط ليكرا" class="w-full bg-white border border-gray-300 rounded-lg p-2 text-gray-800 focus:ring-2 focus:ring-excel-600 focus:outline-none">
+            </div>
+
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">اللون العام / التلوين</label>
+              <input type="text" id="cutColorInput" placeholder="مثال: زيتي / كحلي" class="w-full bg-white border border-gray-300 rounded-lg p-2 text-gray-800 focus:ring-2 focus:ring-excel-600 focus:outline-none">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">الموسم</label>
+              <input type="text" id="cutSeasonInput" value="صيف 2025" class="w-full bg-white border border-gray-300 rounded-lg p-2 text-gray-800 focus:ring-2 focus:ring-excel-600 focus:outline-none">
+            </div>
+
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">المرحلة الحالية للقصة</label>
+              <select id="cutProductionStageInput" class="w-full bg-white border border-gray-300 rounded-lg p-2 font-bold text-gray-700 focus:ring-2 focus:ring-excel-600 focus:outline-none">
+                <option value="بالمخزن">بالمخزن (جاهزة للتشغيل)</option>
+                <option value="قص">قص (جاري القص)</option>
+                <option value="طباعة">طباعة</option>
+                <option value="تطريز">تطريز</option>
+                <option value="خياطة">خياطة / تجميع</option>
+                <option value="تجهيز">تجهيز وتشطيب</option>
+                <option value="مكتمل">مكتمل ومسلم للمخزن</option>
+              </select>
+            </div>
+
+            <!-- Image Upload Box -->
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">صورة الموديل / العينة</label>
+              <div class="flex items-center gap-2">
+                <input type="file" id="cutImageFileInput" accept="image/*" onchange="handleCutImageUpload(event)" class="text-xs text-gray-500 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-excel-50 file:text-excel-700 hover:file:bg-excel-100 cursor-pointer w-full">
+                <button type="button" id="removeImageBtn" onclick="removeCutImage()" class="hidden px-2 py-1.5 bg-red-100 text-red-700 rounded hover:bg-red-200 font-bold text-xs" title="حذف الصورة">
+                  <i class="fa-solid fa-trash-can"></i>
+                </button>
+              </div>
+              <div id="imagePreviewContainer" class="mt-2 hidden">
+                <img id="cutImagePreview" src="" alt="معاينة الموديل" class="h-16 w-16 object-cover rounded-lg border border-gray-300 shadow-sm">
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- SECTION 2: DYNAMIC TABLE - BLOUSE DETAILS (تفاصيل ومواصفات البلوزة) -->
+        <div class="bg-white rounded-xl border border-emerald-300 shadow-sm overflow-hidden">
+          <div class="bg-emerald-50/80 px-4 py-3 border-b border-emerald-200 flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs">1</span>
+              <h4 class="font-extrabold text-emerald-900 text-xs md:text-sm">مواصفات ورولات قماش البلوزة (Dynamic Rolls)</h4>
+            </div>
+            <button type="button" onclick="addBlouseRow()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1 px-3 rounded-lg text-xs flex items-center gap-1.5 shadow transition">
+              <i class="fa-solid fa-plus text-[10px]"></i>
+              <span>+ إضافة سطر رول بلوزة</span>
+            </button>
+          </div>
+
+          <div class="p-3 bg-gray-50 border-b border-gray-200 grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2 text-xs">
+            <div>
+              <label class="block font-bold text-gray-600 text-[11px] mb-0.5">طول البلوزة (سم)</label>
+              <input type="number" step="0.1" id="blouseSpecLength" placeholder="مثال: 75" class="w-full bg-white border border-gray-300 rounded p-1.5 text-xs focus:ring-1 focus:ring-emerald-600">
+            </div>
+            <div>
+              <label class="block font-bold text-gray-600 text-[11px] mb-0.5">عرض البلوزة (سم)</label>
+              <input type="number" step="0.1" id="blouseSpecWidth" placeholder="مثال: 54" class="w-full bg-white border border-gray-300 rounded p-1.5 text-xs focus:ring-1 focus:ring-emerald-600">
+            </div>
+            <div>
+              <label class="block font-bold text-gray-600 text-[11px] mb-0.5">القصة / الباترون</label>
+              <input type="text" id="blouseSpecCut" placeholder="مثال: أوفر سايز" class="w-full bg-white border border-gray-300 rounded p-1.5 text-xs focus:ring-1 focus:ring-emerald-600">
+            </div>
+            <div>
+              <label class="block font-bold text-gray-600 text-[11px] mb-0.5">التلوين / الصباغة</label>
+              <input type="text" id="blouseSpecColoring" placeholder="مثال: موحد / قطيفة" class="w-full bg-white border border-gray-300 rounded p-1.5 text-xs focus:ring-1 focus:ring-emerald-600">
+            </div>
+            <div>
+              <label class="block font-bold text-gray-600 text-[11px] mb-0.5">الريب (Rib) كجم</label>
+              <input type="number" step="0.01" id="blouseSpecRib" placeholder="0" class="w-full bg-white border border-gray-300 rounded p-1.5 text-xs focus:ring-1 focus:ring-emerald-600">
+            </div>
+            <div>
+              <label class="block font-bold text-gray-600 text-[11px] mb-0.5">ملاحظات البلوزة</label>
+              <input type="text" id="blouseSpecNotes" placeholder="ملاحظات..." class="w-full bg-white border border-gray-300 rounded p-1.5 text-xs focus:ring-1 focus:ring-emerald-600">
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-right text-xs">
+              <thead class="bg-gray-100 text-gray-700 font-bold border-b border-gray-200">
+                <tr>
+                  <th class="p-2.5 w-12 text-center">م</th>
+                  <th class="p-2.5">رقم الرول / الثوب</th>
+                  <th class="p-2.5 text-center">عدد الراقات (Layers) *</th>
+                  <th class="p-2.5 text-center">وزن الرول (كجم) *</th>
+                  <th class="p-2.5">ملاحظات الرول</th>
+                  <th class="p-2.5 w-16 text-center">حذف</th>
+                </tr>
+              </thead>
+              <tbody id="blouseRowsBody" class="divide-y divide-gray-100">
+                <!-- Injected via JS -->
+              </tbody>
+              <tfoot class="bg-emerald-50/50 font-bold text-emerald-900 border-t border-emerald-200">
+                <tr>
+                  <td colspan="2" class="p-2.5 text-right">إجمالي رولات البلوزة:</td>
+                  <td id="blouseTotalLayers" class="p-2.5 text-center font-extrabold">0 راق</td>
+                  <td id="blouseTotalWeight" class="p-2.5 text-center font-extrabold">0 كجم</td>
+                  <td colspan="2" class="p-2.5 text-left text-[11px] text-gray-500">مجموع الأوزان والراقات للبلوزة</td>
+                </tr>
+              </tfoot>
+            </table>
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block font-bold text-gray-700 mb-1">الموسم</label>
-            <input type="text" id="cutSeasonInput" value="صيف 2025" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-excel-600 focus:outline-none">
+        <!-- SECTION 3: DYNAMIC TABLE - PANTS DETAILS (تفاصيل ومواصفات البنطلون) -->
+        <div class="bg-white rounded-xl border border-blue-300 shadow-sm overflow-hidden">
+          <div class="bg-blue-50/80 px-4 py-3 border-b border-blue-200 flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs">2</span>
+              <h4 class="font-extrabold text-blue-900 text-xs md:text-sm">مواصفات ورولات قماش البنطلون (Dynamic Rolls)</h4>
+            </div>
+            <button type="button" onclick="addPantsRow()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded-lg text-xs flex items-center gap-1.5 shadow transition">
+              <i class="fa-solid fa-plus text-[10px]"></i>
+              <span>+ إضافة سطر رول بنطلون</span>
+            </button>
           </div>
-          <div>
-            <label class="block font-bold text-gray-700 mb-1">الكمية المستهدفة (قطع)</label>
-            <input type="number" id="cutTargetPiecesInput" min="0" placeholder="0" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 font-bold focus:ring-2 focus:ring-excel-600 focus:outline-none">
+
+          <div class="p-3 bg-gray-50 border-b border-gray-200 grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2 text-xs">
+            <div>
+              <label class="block font-bold text-gray-600 text-[11px] mb-0.5">طول البنطلون (سم)</label>
+              <input type="number" step="0.1" id="pantsSpecLength" placeholder="مثال: 102" class="w-full bg-white border border-gray-300 rounded p-1.5 text-xs focus:ring-1 focus:ring-blue-600">
+            </div>
+            <div>
+              <label class="block font-bold text-gray-600 text-[11px] mb-0.5">عرض الوسط / الفخذ (سم)</label>
+              <input type="number" step="0.1" id="pantsSpecWidth" placeholder="مثال: 32" class="w-full bg-white border border-gray-300 rounded p-1.5 text-xs focus:ring-1 focus:ring-blue-600">
+            </div>
+            <div>
+              <label class="block font-bold text-gray-600 text-[11px] mb-0.5">القصة / الباترون</label>
+              <input type="text" id="pantsSpecCut" placeholder="مثال: وايد ليج / شارلستون" class="w-full bg-white border border-gray-300 rounded p-1.5 text-xs focus:ring-1 focus:ring-blue-600">
+            </div>
+            <div>
+              <label class="block font-bold text-gray-600 text-[11px] mb-0.5">التلوين / الصباغة</label>
+              <input type="text" id="pantsSpecColoring" placeholder="مثال: أسود كربوني" class="w-full bg-white border border-gray-300 rounded p-1.5 text-xs focus:ring-1 focus:ring-blue-600">
+            </div>
+            <div>
+              <label class="block font-bold text-gray-600 text-[11px] mb-0.5">الريب / أستك كجم</label>
+              <input type="number" step="0.01" id="pantsSpecRib" placeholder="0" class="w-full bg-white border border-gray-300 rounded p-1.5 text-xs focus:ring-1 focus:ring-blue-600">
+            </div>
+            <div>
+              <label class="block font-bold text-gray-600 text-[11px] mb-0.5">ملاحظات البنطلون</label>
+              <input type="text" id="pantsSpecNotes" placeholder="ملاحظات..." class="w-full bg-white border border-gray-300 rounded p-1.5 text-xs focus:ring-1 focus:ring-blue-600">
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-right text-xs">
+              <thead class="bg-gray-100 text-gray-700 font-bold border-b border-gray-200">
+                <tr>
+                  <th class="p-2.5 w-12 text-center">م</th>
+                  <th class="p-2.5">رقم الرول / الثوب</th>
+                  <th class="p-2.5 text-center">عدد الراقات (Layers) *</th>
+                  <th class="p-2.5 text-center">وزن الرول (كجم) *</th>
+                  <th class="p-2.5">ملاحظات الرول</th>
+                  <th class="p-2.5 w-16 text-center">حذف</th>
+                </tr>
+              </thead>
+              <tbody id="pantsRowsBody" class="divide-y divide-gray-100">
+                <!-- Injected via JS -->
+              </tbody>
+              <tfoot class="bg-blue-50/50 font-bold text-blue-900 border-t border-blue-200">
+                <tr>
+                  <td colspan="2" class="p-2.5 text-right">إجمالي رولات البنطلون:</td>
+                  <td id="pantsTotalLayers" class="p-2.5 text-center font-extrabold">0 راق</td>
+                  <td id="pantsTotalWeight" class="p-2.5 text-center font-extrabold">0 كجم</td>
+                  <td colspan="2" class="p-2.5 text-left text-[11px] text-gray-500">مجموع الأوزان والراقات للبنطلون</td>
+                </tr>
+              </tfoot>
+            </table>
           </div>
         </div>
 
-        <div>
-          <label class="block font-bold text-gray-700 mb-1">ملاحظات القصة</label>
-          <input type="text" id="cutNotesInput" placeholder="أي تفاصيل خاصة بالقصة..." class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-excel-600 focus:outline-none">
+        <!-- SECTION 4: SUMMARY & TOTALS -->
+        <div class="p-4 bg-gray-50 rounded-xl border border-gray-200 flex flex-wrap items-center justify-between gap-4">
+          <div class="flex items-center gap-6">
+            <div>
+              <span class="text-gray-500 block text-[11px]">إجمالي أثواب/رولات القماش:</span>
+              <span id="grandTotalRolls" class="font-extrabold text-sm text-gray-800">0 رول</span>
+            </div>
+            <div>
+              <span class="text-gray-500 block text-[11px]">إجمالي وزن القماش المستهلك:</span>
+              <span id="grandTotalWeight" class="font-extrabold text-sm text-excel-700">0.00 كجم</span>
+            </div>
+            <div>
+              <span class="text-gray-500 block text-[11px]">مجموع الراقات المنفذة:</span>
+              <span id="grandTotalLayers" class="font-extrabold text-sm text-blue-700">0 راق</span>
+            </div>
+          </div>
+
+          <div class="flex-1 max-w-xs">
+            <label class="block font-bold text-gray-700 mb-1">ملاحظات وتوجيهات عامة للقصة</label>
+            <input type="text" id="cutNotesInput" placeholder="أي تفاصيل خاصة بتشغيل القصة..." class="w-full bg-white border border-gray-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-excel-600 focus:outline-none">
+          </div>
         </div>
 
-        <div class="pt-3 border-t border-gray-200 flex justify-end gap-2">
-          <button type="button" onclick="closeModal('addCutModal')" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg transition">إلغاء</button>
-          <button type="submit" class="px-5 py-2 bg-excel-600 hover:bg-excel-700 text-white font-bold rounded-lg shadow transition">حفظ القصة</button>
+        <!-- Form Footer Actions -->
+        <div class="pt-3 border-t border-gray-200 flex justify-end gap-3 shrink-0">
+          <button type="button" onclick="closeModal('addCutModal')" class="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg transition">إلغاء</button>
+          <button type="submit" class="px-6 py-2.5 bg-excel-600 hover:bg-excel-700 text-white font-bold rounded-lg shadow-md transition flex items-center gap-2">
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+            <span id="cutSubmitBtnText">حفظ ومزامنة القصة</span>
+          </button>
         </div>
 
       </form>
@@ -1292,6 +1694,186 @@
         </div>
 
       </div>
+    </div>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- MODAL 5: CUT DETAILS & SPEC SHEET VIEW (معاينة ورقة القص والتفاصيل) -->
+  <!-- =================================================================== -->
+  <div id="cutDetailsModal" class="modal-overlay hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 md:p-6 overflow-y-auto">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-scale-up">
+      
+      <div class="bg-excel-700 text-white px-6 py-4 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-xl">
+            <i class="fa-solid fa-file-lines"></i>
+          </div>
+          <div>
+            <h3 id="detailModalTitle" class="font-bold text-base md:text-lg">بطاقة تفاصيل ومواصفات القصة</h3>
+            <p id="detailModalSubtitle" class="text-xs text-excel-100">عرض كامل لبيانات الموديل، الأوزان، الراقات، والمراحل</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="printCutDetailsSheet()" class="bg-white/15 hover:bg-white/25 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition">
+            <i class="fa-solid fa-print"></i>
+            <span>طباعة الورقة</span>
+          </button>
+          <button onclick="closeModal('cutDetailsModal')" class="text-white/80 hover:text-white p-2 hover:bg-white/10 rounded-lg transition">
+            <i class="fa-solid fa-xmark text-xl"></i>
+          </button>
+        </div>
+      </div>
+
+      <div id="cutDetailsModalContent" class="p-6 overflow-y-auto space-y-6 text-xs flex-1">
+        <!-- Injected via JS -->
+      </div>
+
+      <div class="p-4 bg-gray-50 border-t border-gray-200 flex justify-between items-center shrink-0">
+        <span class="text-gray-500 text-xs">نظام مخازن القصات إكسل • ورقة فنية معتمدة</span>
+        <button onclick="closeModal('cutDetailsModal')" class="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-lg transition">إغلاق</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- MODAL 6: FIREBASE CLOUD CONFIG (إعدادات الربط مع Firebase Realtime DB) -->
+  <!-- =================================================================== -->
+  <div id="firebaseSettingsModal" class="modal-overlay hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-xl w-full overflow-hidden animate-scale-up">
+      
+      <div class="bg-gradient-to-r from-amber-600 to-amber-500 text-white px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-xl shadow">
+            <i class="fa-solid fa-fire-flame-curved"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-base">إعدادات الربط السحابي (Firebase Realtime)</h3>
+            <p class="text-xs text-amber-100">لحفظ البيانات سحابياً والعمل المشترك بينك وبين زملائك لحظياً</p>
+          </div>
+        </div>
+        <button onclick="closeModal('firebaseSettingsModal')" class="text-white/80 hover:text-white p-2 hover:bg-white/10 rounded-lg transition">
+          <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-4 text-xs">
+        <div class="p-3.5 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 space-y-2">
+          <div class="flex items-center gap-2 font-bold text-sm">
+            <i class="fa-solid fa-circle-question text-amber-600"></i>
+            <span>كيف تحصل على إعدادات Firebase الخاصة بك؟</span>
+          </div>
+          <ol class="list-decimal list-inside space-y-1 text-xs text-amber-800 leading-relaxed pr-1">
+            <li>افتح موقع <a href="https://console.firebase.google.com" target="_blank" class="font-bold underline text-amber-900">console.firebase.google.com</a> وسجل بحساب Google.</li>
+            <li>اضغط <strong>Add project</strong> واكتب اسم المشروع (مثال: Garment-Cuts-ERP).</li>
+            <li>من القائمة الجانبية اختر <strong>Realtime Database</strong> ثم <strong>Create Database</strong> واختر Start in <strong>Test mode</strong>.</li>
+            <li>من إعدادات المشروع (Project Settings) > General > Apps > أضف Web App وافرغ كود <code>firebaseConfig</code> هنا.</li>
+          </ol>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block font-bold text-gray-700">ألصق كود Firebase Config (JSON أو JavaScript Object):</label>
+            <button type="button" onclick="loadSampleFirebaseConfigTemplate()" class="text-excel-700 hover:underline font-bold text-[11px]">ملء نموذج فارغ</button>
+          </div>
+          <textarea id="firebaseConfigJsonInput" rows="7" dir="ltr" placeholder='{
+  "apiKey": "AIzaSy...",
+  "authDomain": "your-app.firebaseapp.com",
+  "databaseURL": "https://your-app-default-rtdb.firebaseio.com",
+  "projectId": "your-app",
+  "storageBucket": "your-app.appspot.com",
+  "messagingSenderId": "...",
+  "appId": "..."
+}' class="w-full font-mono text-[11px] bg-gray-50 border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-amber-500 focus:outline-none leading-normal"></textarea>
+          <p class="text-[11px] text-gray-500 mt-1">تأكد من وجود رابط <strong>databaseURL</strong> في الإعدادات ليعمل الـ Realtime Database بنجاح.</p>
+        </div>
+
+        <div id="firebaseConnectionMsg" class="hidden p-3 rounded-lg text-xs font-bold flex items-center gap-2"></div>
+
+        <div class="pt-3 border-t border-gray-200 flex flex-wrap justify-between items-center gap-2">
+          <button type="button" onclick="disconnectFirebase()" class="text-red-600 hover:text-red-800 hover:bg-red-50 px-3 py-2 rounded-lg font-bold transition flex items-center gap-1.5">
+            <i class="fa-solid fa-link-slash"></i>
+            <span>فصل Firebase والعودة للتخزين المحلي</span>
+          </button>
+          <div class="flex gap-2">
+            <button type="button" onclick="closeModal('firebaseSettingsModal')" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg transition">إلغاء</button>
+            <button type="button" onclick="saveAndConnectFirebase()" class="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg shadow transition flex items-center gap-1.5">
+              <i class="fa-solid fa-plug-circle-check"></i>
+              <span>حفظ واتصال الآن</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- MODAL 8: CHANGE PASSWORD & SECURITY SETTINGS (إعدادات كلمة المرور) -->
+  <!-- =================================================================== -->
+  <div id="changePasswordModal" class="modal-overlay hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-scale-up">
+      
+      <div class="bg-gradient-to-r from-emerald-600 to-excel-700 text-white px-5 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center text-lg">
+            <i class="fa-solid fa-key"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-base leading-tight">إعدادات كلمة المرور</h3>
+            <p class="text-xs text-emerald-100">حماية النظام وتغيير الرمز السري</p>
+          </div>
+        </div>
+        <button onclick="closeModal('changePasswordModal')" class="text-white/80 hover:text-white p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form onsubmit="handleChangePasswordSubmit(event)" class="p-6 space-y-4 text-xs">
+        
+        <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-900 space-y-1">
+          <div class="font-bold flex items-center gap-1.5 text-xs">
+            <i class="fa-solid fa-shield-halved text-emerald-600"></i>
+            <span>كلمة المرور الافتراضية للنظام:</span>
+            <span class="font-mono bg-emerald-200/80 px-2 py-0.5 rounded text-xs font-black">010019</span>
+          </div>
+          <p class="text-[11px] text-emerald-700">يمكنك الإبقاء عليها أو تخصيص كلمة مرور جديدة حسب رغبتك.</p>
+        </div>
+
+        <div>
+          <label class="block font-bold text-gray-700 mb-1">كلمة المرور الحالية: <span class="text-red-500">*</span></label>
+          <input type="password" id="currentPwdInput" required placeholder="أدخل كلمة المرور الحالية (010019)" class="w-full text-xs bg-gray-50 border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block font-bold text-gray-700 mb-1">كلمة المرور الجديدة: <span class="text-red-500">*</span></label>
+          <input type="password" id="newPwdInput" required placeholder="أدخل كلمة المرور الجديدة" class="w-full text-xs bg-gray-50 border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block font-bold text-gray-700 mb-1">تأكيد كلمة المرور الجديدة: <span class="text-red-500">*</span></label>
+          <input type="password" id="confirmNewPwdInput" required placeholder="أعد كتابة كلمة المرور الجديدة للتأكيد" class="w-full text-xs bg-gray-50 border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+        </div>
+
+        <div id="changePwdMsg" class="hidden p-2.5 rounded-lg text-xs font-bold text-center"></div>
+
+        <div class="pt-3 border-t border-gray-200 flex flex-wrap justify-between items-center gap-2">
+          <button type="button" onclick="resetPasswordToDefault()" class="text-xs text-gray-500 hover:text-red-600 hover:underline flex items-center gap-1 font-bold">
+            <i class="fa-solid fa-rotate-left"></i>
+            <span>استعادة الرمز الافتراضي (010019)</span>
+          </button>
+          <div class="flex gap-2">
+            <button type="button" onclick="closeModal('changePasswordModal')" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg transition">إلغاء</button>
+            <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow transition flex items-center gap-1.5">
+              <i class="fa-solid fa-floppy-disk"></i>
+              <span>حفظ التعديل</span>
+            </button>
+          </div>
+        </div>
+
+      </form>
+
     </div>
   </div>
 

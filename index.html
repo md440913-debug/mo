@@ -53,6 +53,94 @@
 </head>
 <body class="bg-gray-100 text-gray-800 font-cairo antialiased min-h-screen flex flex-col md:flex-row overflow-x-hidden">
 
+  <!-- ======================== SECURITY AUTH LOCK SCREEN (010019) ======================== -->
+  <div id="authLockScreen" class="fixed inset-0 z-[99999] bg-gradient-to-br from-gray-950 via-excel-950 to-gray-900 flex items-center justify-center p-4 overflow-y-auto">
+    <div class="max-w-md w-full bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-6 md:p-8 shadow-2xl text-white text-center space-y-6 animate-scale-up relative overflow-hidden my-auto">
+      
+      <!-- Ambient Glow Accents -->
+      <div class="absolute -top-20 -left-20 w-44 h-44 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="absolute -bottom-20 -right-20 w-44 h-44 bg-excel-500/20 rounded-full blur-3xl pointer-events-none"></div>
+
+      <!-- Security Shield & App Icon -->
+      <div class="relative">
+        <div class="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-tr from-excel-600 to-emerald-400 p-0.5 shadow-xl shadow-emerald-950/60">
+          <div class="w-full h-full bg-gray-900/80 backdrop-blur rounded-2xl flex items-center justify-center text-3xl text-emerald-400">
+            <i id="lockScreenIcon" class="fa-solid fa-lock"></i>
+          </div>
+        </div>
+        <div class="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-[11px] font-bold tracking-wide">
+          <i class="fa-solid fa-shield-halved"></i>
+          <span>نظام مشفر ومحمي • كلمة المرور: 010019</span>
+        </div>
+      </div>
+
+      <!-- Titles -->
+      <div class="space-y-1">
+        <h2 class="text-xl md:text-2xl font-black text-white tracking-wide">مخازن القصات إكسل</h2>
+        <p class="text-xs text-gray-300 leading-relaxed">أدخل كلمة المرور للوصول إلى قاعدة بيانات وأرصدة المستودع</p>
+      </div>
+
+      <!-- Password Form -->
+      <form id="authLockForm" onsubmit="handleAuthSubmit(event)" class="space-y-4">
+        <div class="relative">
+          <input 
+            type="password" 
+            id="authPasswordInput" 
+            autocomplete="current-password"
+            placeholder="كلمة المرور..." 
+            dir="ltr"
+            class="w-full bg-gray-950/70 border-2 border-white/20 focus:border-emerald-400 text-white placeholder-gray-500 text-center font-mono font-bold tracking-widest text-xl rounded-2xl py-3.5 px-12 focus:ring-4 focus:ring-emerald-500/20 focus:outline-none transition shadow-inner"
+          >
+          <button 
+            type="button" 
+            onclick="toggleAuthPasswordVisibility()" 
+            class="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition p-1.5 text-sm"
+            title="إظهار / إخفاء كلمة المرور">
+            <i id="authEyeIcon" class="fa-solid fa-eye"></i>
+          </button>
+        </div>
+
+        <!-- Quick Numeric Keypad for fast touch input -->
+        <div class="grid grid-cols-3 gap-2 pt-1 text-base font-bold font-mono">
+          <button type="button" onclick="keypadPress('1')" class="py-2.5 bg-white/5 hover:bg-white/15 active:bg-emerald-600/50 rounded-xl border border-white/10 transition shadow-xs">1</button>
+          <button type="button" onclick="keypadPress('2')" class="py-2.5 bg-white/5 hover:bg-white/15 active:bg-emerald-600/50 rounded-xl border border-white/10 transition shadow-xs">2</button>
+          <button type="button" onclick="keypadPress('3')" class="py-2.5 bg-white/5 hover:bg-white/15 active:bg-emerald-600/50 rounded-xl border border-white/10 transition shadow-xs">3</button>
+          <button type="button" onclick="keypadPress('4')" class="py-2.5 bg-white/5 hover:bg-white/15 active:bg-emerald-600/50 rounded-xl border border-white/10 transition shadow-xs">4</button>
+          <button type="button" onclick="keypadPress('5')" class="py-2.5 bg-white/5 hover:bg-white/15 active:bg-emerald-600/50 rounded-xl border border-white/10 transition shadow-xs">5</button>
+          <button type="button" onclick="keypadPress('6')" class="py-2.5 bg-white/5 hover:bg-white/15 active:bg-emerald-600/50 rounded-xl border border-white/10 transition shadow-xs">6</button>
+          <button type="button" onclick="keypadPress('7')" class="py-2.5 bg-white/5 hover:bg-white/15 active:bg-emerald-600/50 rounded-xl border border-white/10 transition shadow-xs">7</button>
+          <button type="button" onclick="keypadPress('8')" class="py-2.5 bg-white/5 hover:bg-white/15 active:bg-emerald-600/50 rounded-xl border border-white/10 transition shadow-xs">8</button>
+          <button type="button" onclick="keypadPress('9')" class="py-2.5 bg-white/5 hover:bg-white/15 active:bg-emerald-600/50 rounded-xl border border-white/10 transition shadow-xs">9</button>
+          <button type="button" onclick="keypadClear()" class="py-2.5 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-xl border border-red-500/30 transition text-xs font-sans font-bold">مسح C</button>
+          <button type="button" onclick="keypadPress('0')" class="py-2.5 bg-white/5 hover:bg-white/15 active:bg-emerald-600/50 rounded-xl border border-white/10 transition shadow-xs">0</button>
+          <button type="button" onclick="keypadBackspace()" class="py-2.5 bg-white/5 hover:bg-white/15 active:bg-emerald-600/50 rounded-xl border border-white/10 transition shadow-xs" title="مسح رقم"><i class="fa-solid fa-delete-left"></i></button>
+        </div>
+
+        <!-- Error Message Banner -->
+        <div id="authErrorMsg" class="hidden p-3 rounded-xl bg-red-500/25 border border-red-500/40 text-red-200 text-xs font-bold flex items-center justify-center gap-2 animate-shake">
+          <i class="fa-solid fa-circle-exclamation text-red-300 text-sm"></i>
+          <span id="authErrorText">كلمة المرور غير صحيحة، يرجى المحاولة مرة أخرى!</span>
+        </div>
+
+        <!-- Submit Button -->
+        <button 
+          type="submit" 
+          id="authSubmitBtn"
+          class="w-full bg-gradient-to-r from-emerald-600 to-excel-600 hover:from-emerald-500 hover:to-excel-500 text-white font-extrabold py-3.5 px-6 rounded-2xl shadow-lg shadow-emerald-950/60 transition flex items-center justify-center gap-2 text-sm active:scale-[0.98]">
+          <i class="fa-solid fa-lock-open"></i>
+          <span>فتح النظام وتسجيل الدخول</span>
+        </button>
+      </form>
+
+      <div class="pt-1 text-[11px] text-gray-400 flex items-center justify-center gap-2">
+        <span>ERP Enterprise Warehouse System</span>
+        <span>•</span>
+        <span class="text-emerald-400 font-mono font-bold">PASS: 010019</span>
+      </div>
+
+    </div>
+  </div>
+
   <!-- ======================== TOAST NOTIFICATION CONTAINER ======================== -->
   <div id="toastContainer" class="fixed top-5 left-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
@@ -81,6 +169,9 @@
       <button onclick="openModal('stockOutModal')" class="bg-stockout hover:bg-red-700 text-white text-xs font-bold px-2.5 py-1.5 rounded flex items-center gap-1 shadow">
         <i class="fa-solid fa-minus"></i>
         <span>صرف</span>
+      </button>
+      <button onclick="lockSystem()" class="bg-excel-700 hover:bg-red-600 text-white text-xs font-bold p-1.5 rounded flex items-center justify-center shadow transition" title="قفل النظام (010019)">
+        <i class="fa-solid fa-lock"></i>
       </button>
     </div>
   </header>
@@ -179,8 +270,14 @@
           <span>تحميل شيت Excel</span>
         </button>
       </div>
-      <div class="text-[11px] text-gray-400 text-center pt-1 border-t border-gray-200">
-        نظام ويب متجاوب • تخزين محلي آمن
+      <div class="pt-2 border-t border-gray-200">
+        <button onclick="lockSystem()" class="w-full text-center py-2 px-3 rounded-lg text-xs font-bold text-red-600 hover:bg-red-50 hover:text-red-700 border border-red-200 transition flex items-center justify-center gap-1.5 shadow-2xs">
+          <i class="fa-solid fa-lock"></i>
+          <span>قفل النظام (010019)</span>
+        </button>
+      </div>
+      <div class="text-[11px] text-gray-400 text-center pt-1">
+        نظام ويب متجاوب • محمي بكلمة مرور
       </div>
     </div>
   </aside>
@@ -209,7 +306,11 @@
         </div>
       </div>
 
-      <div class="flex items-center gap-2.5">
+      <div class="flex items-center gap-2">
+        <button onclick="lockSystem()" class="bg-gray-100 hover:bg-red-50 hover:text-red-700 text-gray-700 text-xs font-bold px-3 py-2 rounded-lg border border-gray-200 flex items-center gap-1.5 transition" title="قفل النظام وشاشة الحماية">
+          <i class="fa-solid fa-lock text-sm text-gray-500"></i>
+          <span>قفل النظام</span>
+        </button>
         <button onclick="openFirebaseSettingsModal()" class="bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold px-3 py-2 rounded-lg border border-amber-300 flex items-center gap-1.5 transition" title="إعدادات المزامنة السحابية">
           <i class="fa-solid fa-fire-flame-curved text-amber-600 text-sm"></i>
           <span>ربط Firebase</span>
@@ -878,8 +979,48 @@
           <p class="text-xs text-gray-500">حفظ ونقل البيانات واستيراد ملفات الإكسل مع الفحص والتدقيق الآلي</p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           
+          <!-- System Security & Password Protection Card -->
+          <div class="bg-white p-5 rounded-xl shadow-sm border-2 border-emerald-200 space-y-4 relative overflow-hidden">
+            <div class="absolute -top-3 -left-3 bg-emerald-600 text-white text-[10px] font-bold px-4 py-1 rotate-[-15deg] shadow">أمان ومحمي</div>
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-shield-halved"></i>
+              </div>
+              <div>
+                <h3 class="font-bold text-sm text-gray-800">حماية النظام بكلمة مرور</h3>
+                <p class="text-xs text-gray-500">حماية بيانات المخزن ومنع الوصول غير المصرح به</p>
+              </div>
+            </div>
+
+            <div class="space-y-3 pt-2">
+              <div class="p-3 bg-emerald-50 rounded-lg text-xs space-y-1.5 border border-emerald-200">
+                <div class="flex items-center justify-between font-bold text-emerald-900">
+                  <span>حالة الحماية:</span>
+                  <span class="text-xs font-bold px-2 py-0.5 rounded bg-emerald-200/80 text-emerald-900 flex items-center gap-1">
+                    <i class="fa-solid fa-lock text-[10px]"></i>
+                    <span>مفعلة</span>
+                  </span>
+                </div>
+                <div class="flex items-center justify-between text-[11px] text-emerald-800">
+                  <span>كلمة المرور الافتراضية:</span>
+                  <strong class="font-mono bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-300">010019</strong>
+                </div>
+              </div>
+
+              <button onclick="lockSystem()" class="w-full bg-gray-900 hover:bg-black text-white font-bold py-2.5 px-4 rounded-lg text-xs flex items-center justify-center gap-2 shadow transition">
+                <i class="fa-solid fa-lock"></i>
+                <span>قفل شاشة النظام الآن</span>
+              </button>
+
+              <button onclick="openModal('changePasswordModal')" class="w-full bg-white hover:bg-emerald-50 text-emerald-800 font-bold py-2 px-3 rounded-lg text-xs border border-emerald-300 transition flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-key"></i>
+                <span>تغيير كلمة المرور أو إعادة ضبطها</span>
+              </button>
+            </div>
+          </div>
+
           <!-- Firebase Realtime Database Card -->
           <div class="bg-white p-5 rounded-xl shadow-sm border-2 border-amber-200 space-y-4 relative overflow-hidden">
             <div class="absolute -top-3 -left-3 bg-amber-500 text-white text-[10px] font-bold px-4 py-1 rotate-[-15deg] shadow">سحابي مباشر</div>
@@ -1664,6 +1805,74 @@
         </div>
 
       </div>
+
+    </div>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- MODAL 8: CHANGE PASSWORD & SECURITY SETTINGS (إعدادات كلمة المرور) -->
+  <!-- =================================================================== -->
+  <div id="changePasswordModal" class="modal-overlay hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-scale-up">
+      
+      <div class="bg-gradient-to-r from-emerald-600 to-excel-700 text-white px-5 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center text-lg">
+            <i class="fa-solid fa-key"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-base leading-tight">إعدادات كلمة المرور</h3>
+            <p class="text-xs text-emerald-100">حماية النظام وتغيير الرمز السري</p>
+          </div>
+        </div>
+        <button onclick="closeModal('changePasswordModal')" class="text-white/80 hover:text-white p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form onsubmit="handleChangePasswordSubmit(event)" class="p-6 space-y-4 text-xs">
+        
+        <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-900 space-y-1">
+          <div class="font-bold flex items-center gap-1.5 text-xs">
+            <i class="fa-solid fa-shield-halved text-emerald-600"></i>
+            <span>كلمة المرور الافتراضية للنظام:</span>
+            <span class="font-mono bg-emerald-200/80 px-2 py-0.5 rounded text-xs font-black">010019</span>
+          </div>
+          <p class="text-[11px] text-emerald-700">يمكنك الإبقاء عليها أو تخصيص كلمة مرور جديدة حسب رغبتك.</p>
+        </div>
+
+        <div>
+          <label class="block font-bold text-gray-700 mb-1">كلمة المرور الحالية: <span class="text-red-500">*</span></label>
+          <input type="password" id="currentPwdInput" required placeholder="أدخل كلمة المرور الحالية (010019)" class="w-full text-xs bg-gray-50 border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block font-bold text-gray-700 mb-1">كلمة المرور الجديدة: <span class="text-red-500">*</span></label>
+          <input type="password" id="newPwdInput" required placeholder="أدخل كلمة المرور الجديدة" class="w-full text-xs bg-gray-50 border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block font-bold text-gray-700 mb-1">تأكيد كلمة المرور الجديدة: <span class="text-red-500">*</span></label>
+          <input type="password" id="confirmNewPwdInput" required placeholder="أعد كتابة كلمة المرور الجديدة للتأكيد" class="w-full text-xs bg-gray-50 border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+        </div>
+
+        <div id="changePwdMsg" class="hidden p-2.5 rounded-lg text-xs font-bold text-center"></div>
+
+        <div class="pt-3 border-t border-gray-200 flex flex-wrap justify-between items-center gap-2">
+          <button type="button" onclick="resetPasswordToDefault()" class="text-xs text-gray-500 hover:text-red-600 hover:underline flex items-center gap-1 font-bold">
+            <i class="fa-solid fa-rotate-left"></i>
+            <span>استعادة الرمز الافتراضي (010019)</span>
+          </button>
+          <div class="flex gap-2">
+            <button type="button" onclick="closeModal('changePasswordModal')" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg transition">إلغاء</button>
+            <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow transition flex items-center gap-1.5">
+              <i class="fa-solid fa-floppy-disk"></i>
+              <span>حفظ التعديل</span>
+            </button>
+          </div>
+        </div>
+
+      </form>
 
     </div>
   </div>
