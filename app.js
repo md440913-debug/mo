@@ -8,6 +8,17 @@
 // ==========================================
 
 const STORAGE_KEY = 'EXCEL_CUTS_ERP_DATA_V2';
+const FIREBASE_CONFIG_STORAGE_KEY = 'EXCEL_CUTS_FIREBASE_CONFIG';
+
+// Global Firebase reference & connection status
+let firebaseApp = null;
+let firebaseDb = null;
+let firebaseConnected = false;
+let isRemoteSync = false; // Flag to prevent infinite loop on realtime listener
+
+// Dynamic form rows state for Blouse & Pants
+let currentBlouseRows = [];
+let currentPantsRows = [];
 
 // Default initial dataset (preserves warehouse state)
 const DEFAULT_DATA = {
@@ -172,7 +183,7 @@ let appState = {
   pendingImportRows: []
 };
 
-// Initialize State from LocalStorage
+// Initialize State from LocalStorage & Firebase
 function initDatabase() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -185,7 +196,7 @@ function initDatabase() {
       appState.cuts = [...DEFAULT_DATA.cuts];
       appState.transactions = [...DEFAULT_DATA.transactions];
       appState.audits = [...DEFAULT_DATA.audits];
-      saveData();
+      saveDataLocally();
     }
   } catch (err) {
     console.error("Failed to load local storage:", err);
@@ -193,9 +204,12 @@ function initDatabase() {
     appState.transactions = [...DEFAULT_DATA.transactions];
     appState.audits = [];
   }
+
+  // Attempt to initialize Firebase if saved config exists
+  initFirebaseFromStorage();
 }
 
-function saveData() {
+function saveDataLocally() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       cuts: appState.cuts,
@@ -205,7 +219,276 @@ function saveData() {
     updateSidebarKPIs();
     populateCutsDatalists();
   } catch (err) {
-    console.error("Save data failed:", err);
+    console.error("Save local data failed:", err);
+  }
+}
+
+// Master saveData: Saves locally and pushes to Firebase in real-time
+function saveData() {
+  saveDataLocally();
+
+  // If Firebase Realtime DB is active and this change was triggered locally, push to cloud
+  if (firebaseDb && firebaseConnected && !isRemoteSync) {
+    try {
+      firebaseDb.ref('warehouse_erp').set({
+        cuts: appState.cuts || [],
+        transactions: appState.transactions || [],
+        audits: appState.audits || [],
+        lastUpdated: new Date().toISOString(),
+        updatedBy: 'Client'
+      }).catch(err => {
+        console.warn("Firebase push error:", err);
+      });
+    } catch (e) {
+      console.warn("Firebase sync error:", e);
+    }
+  }
+}
+
+// Push local state to Firebase manually
+function syncLocalToFirebase() {
+  if (!firebaseDb || !firebaseConnected) {
+    openFirebaseSettingsModal();
+    showToast('يرجى ضبط اتصال Firebase أولاً للتمكن من رفع البيانات السحابية', 'error');
+    return;
+  }
+  
+  firebaseDb.ref('warehouse_erp').set({
+    cuts: appState.cuts || [],
+    transactions: appState.transactions || [],
+    audits: appState.audits || [],
+    lastUpdated: new Date().toISOString(),
+    updatedBy: 'ManualSync'
+  }).then(() => {
+    showToast('تم رفع كافة بيانات المخزن والقصات إلى Firebase بنجاح!', 'success');
+  }).catch(err => {
+    showToast('حدث خطأ أثناء رفع البيانات إلى Firebase: ' + err.message, 'error');
+  });
+}
+
+// Firebase configuration and connection functions
+function initFirebaseFromStorage() {
+  updateFirebaseStatusUI(false, 'جاري فحص الاتصال...');
+  const savedConfig = localStorage.getItem(FIREBASE_CONFIG_STORAGE_KEY);
+  if (!savedConfig) {
+    updateFirebaseStatusUI(false, 'محلي (بدون Firebase)');
+    return;
+  }
+
+  try {
+    const config = JSON.parse(savedConfig);
+    connectToFirebase(config, false);
+  } catch (err) {
+    console.warn("Invalid stored Firebase config:", err);
+    updateFirebaseStatusUI(false, 'خطأ في إعدادات Firebase');
+  }
+}
+
+function connectToFirebase(config, showToasts = true) {
+  if (typeof firebase === 'undefined') {
+    if (showToasts) showToast('مكتبة Firebase لم تكتمل في المتصفح، تأكد من اتصال الإنترنت', 'error');
+    updateFirebaseStatusUI(false, 'تعذر تحميل مكتبة Firebase');
+    return;
+  }
+
+  try {
+    // Delete previous app if exists
+    if (firebase.apps.length > 0) {
+      firebase.app().delete().catch(() => {});
+    }
+
+    firebaseApp = firebase.initializeApp(config);
+    firebaseDb = firebase.database();
+
+    // Listen to connection state (.info/connected)
+    const connectedRef = firebaseDb.ref('.info/connected');
+    connectedRef.on('value', (snap) => {
+      if (snap.val() === true) {
+        firebaseConnected = true;
+        updateFirebaseStatusUI(true, 'متصل سحابياً مع Firebase (مزامنة فورية)');
+        if (showToasts) showToast('تم الاتصال بقاعدة بيانات Firebase Realtime بنجاح!', 'success');
+      } else {
+        firebaseConnected = false;
+        updateFirebaseStatusUI(false, 'جاري إعادة الاتصال بـ Firebase...');
+      }
+    });
+
+    // Realtime Database sync listener for changes made by other users/devices
+    const erpRef = firebaseDb.ref('warehouse_erp');
+    erpRef.on('value', (snapshot) => {
+      const val = snapshot.val();
+      if (val) {
+        isRemoteSync = true;
+        
+        // Update local appState with cloud data
+        if (Array.isArray(val.cuts)) appState.cuts = val.cuts;
+        if (Array.isArray(val.transactions)) appState.transactions = val.transactions;
+        if (Array.isArray(val.audits)) appState.audits = val.audits;
+
+        saveDataLocally();
+        
+        // Re-render active views
+        renderDashboard();
+        renderExcelSheet();
+        renderCutsView();
+        renderTransactionsView();
+        populateCutsDatalists();
+
+        isRemoteSync = false;
+      } else {
+        // First time initialization on Firebase node: push existing local data
+        erpRef.set({
+          cuts: appState.cuts,
+          transactions: appState.transactions,
+          audits: appState.audits,
+          lastUpdated: new Date().toISOString()
+        });
+      }
+    }, (error) => {
+      console.error("Firebase Read Error:", error);
+      updateFirebaseStatusUI(false, 'خطأ في قراءة Firebase: ' + error.message);
+      if (showToasts) showToast('خطأ في الصلاحيات: تأكد من ضبط قواعد Realtime DB على read: true, write: true', 'error');
+    });
+
+  } catch (err) {
+    console.error("Firebase init error:", err);
+    updateFirebaseStatusUI(false, 'خطأ في إعدادات الاتصال');
+    if (showToasts) showToast('فشل الاتصال بـ Firebase: ' + err.message, 'error');
+  }
+}
+
+function updateFirebaseStatusUI(connected, text) {
+  const badge = document.getElementById('firebaseStatusBadge');
+  const dot = document.getElementById('firebaseStatusDot');
+  const textEl = document.getElementById('firebaseStatusText');
+  const toolsBadge = document.getElementById('toolsFirebaseStatusBadge');
+
+  if (dot) {
+    if (connected) {
+      dot.className = "w-2 h-2 rounded-full bg-green-500 ml-1.5 status-dot-pulse";
+    } else {
+      dot.className = "w-2 h-2 rounded-full bg-amber-500 ml-1.5";
+    }
+  }
+
+  if (textEl) {
+    textEl.textContent = text;
+  }
+
+  if (badge) {
+    if (connected) {
+      badge.className = "cursor-pointer inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-green-100 text-green-800 hover:bg-green-200 transition";
+    } else {
+      badge.className = "cursor-pointer inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 transition";
+    }
+  }
+
+  if (toolsBadge) {
+    toolsBadge.textContent = connected ? 'متصل سحابياً (Realtime Sync ON)' : text;
+    toolsBadge.className = connected 
+      ? 'text-xs font-semibold px-2 py-0.5 rounded bg-green-100 text-green-800'
+      : 'text-xs font-semibold px-2 py-0.5 rounded bg-amber-100 text-amber-800';
+  }
+}
+
+function openFirebaseSettingsModal() {
+  const input = document.getElementById('firebaseConfigJsonInput');
+  const saved = localStorage.getItem(FIREBASE_CONFIG_STORAGE_KEY);
+  if (saved && input) {
+    try {
+      input.value = JSON.stringify(JSON.parse(saved), null, 2);
+    } catch (e) {
+      input.value = saved;
+    }
+  }
+  openModal('firebaseSettingsModal');
+}
+
+function loadSampleFirebaseConfigTemplate() {
+  const input = document.getElementById('firebaseConfigJsonInput');
+  if (input) {
+    input.value = `{
+  "apiKey": "AIzaSyDummyKey_ReplaceWithYourActualKey",
+  "authDomain": "my-garment-cuts.firebaseapp.com",
+  "databaseURL": "https://my-garment-cuts-default-rtdb.firebaseio.com",
+  "projectId": "my-garment-cuts",
+  "storageBucket": "my-garment-cuts.appspot.com",
+  "messagingSenderId": "1234567890",
+  "appId": "1:1234567890:web:abcdef123456"
+}`;
+  }
+}
+
+function saveAndConnectFirebase() {
+  const rawInput = (document.getElementById('firebaseConfigJsonInput')?.value || '').trim();
+  const msgEl = document.getElementById('firebaseConnectionMsg');
+
+  if (!rawInput) {
+    showToast('يرجى لصق كود Firebase Config', 'error');
+    return;
+  }
+
+  let configObj = null;
+
+  try {
+    // Try standard JSON parse
+    configObj = JSON.parse(rawInput);
+  } catch (e) {
+    // Try relaxed eval for JS snippet like const firebaseConfig = { ... };
+    try {
+      const sanitized = rawInput
+        .replace(/const\s+firebaseConfig\s*=\s*/i, '')
+        .replace(/let\s+firebaseConfig\s*=\s*/i, '')
+        .replace(/var\s+firebaseConfig\s*=\s*/i, '')
+        .replace(/;?\s*$/, '');
+      configObj = new Function('return ' + sanitized)();
+    } catch (e2) {
+      if (msgEl) {
+        msgEl.textContent = 'صيغة كود الـ Config غير صالحة! يرجى التأكد من نسخه بشكل صحيح.';
+        msgEl.className = 'p-3 rounded-lg text-xs font-bold flex items-center gap-2 bg-red-100 text-red-800';
+        msgEl.classList.remove('hidden');
+      }
+      showToast('صيغة كود الـ Config غير صحيحة، تأكد من أنه JSON صالح', 'error');
+      return;
+    }
+  }
+
+  if (!configObj || !configObj.apiKey) {
+    showToast('كود Config غير مكتمل! تأكد من وجود apiKey و databaseURL', 'error');
+    return;
+  }
+
+  // Save to localStorage
+  localStorage.setItem(FIREBASE_CONFIG_STORAGE_KEY, JSON.stringify(configObj));
+
+  if (msgEl) {
+    msgEl.textContent = 'جاري الاتصال بـ Firebase ومزامنة البيانات...';
+    msgEl.className = 'p-3 rounded-lg text-xs font-bold flex items-center gap-2 bg-blue-100 text-blue-800';
+    msgEl.classList.remove('hidden');
+  }
+
+  connectToFirebase(configObj, true);
+
+  setTimeout(() => {
+    closeModal('firebaseSettingsModal');
+    if (msgEl) msgEl.classList.add('hidden');
+  }, 1200);
+}
+
+function disconnectFirebase() {
+  if (confirm('هل تريد فصل اتصال Firebase والاعتماد على التخزين المحلي فقط في هذا الجهاز؟')) {
+    localStorage.removeItem(FIREBASE_CONFIG_STORAGE_KEY);
+    if (firebaseApp) {
+      try {
+        firebase.app().delete();
+      } catch (e) {}
+    }
+    firebaseApp = null;
+    firebaseDb = null;
+    firebaseConnected = false;
+    updateFirebaseStatusUI(false, 'محلي (غير متصل بـ Firebase)');
+    closeModal('firebaseSettingsModal');
+    showToast('تم فصل اتصال Firebase، التطبيق يعمل الآن في وضع التخزين المحلي', 'info');
   }
 }
 
@@ -636,15 +919,24 @@ function renderCutsView() {
 
     return `
       <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 space-y-3 hover:shadow-md transition">
-        <div class="flex items-start justify-between">
-          <div>
-            <span class="text-xs font-mono font-bold text-excel-700 bg-excel-50 px-2.5 py-1 rounded-md border border-excel-200">
-              ${c.cutNumber}
-            </span>
-            <h3 class="font-bold text-base text-gray-900 mt-1.5">${c.modelName}</h3>
-            <p class="text-xs text-gray-500">${c.fabricType || 'قماش عام'} • ${c.color || 'ألوان متعددة'}</p>
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex items-center gap-3">
+            ${c.image ? `
+              <img src="${c.image}" alt="${c.modelName}" class="w-12 h-12 object-cover rounded-lg border border-gray-200 shadow-xs shrink-0 cursor-pointer" onclick="viewCutDetails('${c.cutNumber}')">
+            ` : `
+              <div class="w-12 h-12 rounded-lg bg-excel-50 text-excel-700 flex items-center justify-center text-lg font-bold border border-excel-200 shrink-0">
+                <i class="fa-solid fa-vest"></i>
+              </div>
+            `}
+            <div>
+              <span class="text-xs font-mono font-bold text-excel-700 bg-excel-50 px-2.5 py-0.5 rounded-md border border-excel-200">
+                ${c.cutNumber}
+              </span>
+              <h3 class="font-bold text-sm text-gray-900 mt-1 cursor-pointer hover:text-excel-700 transition" onclick="viewCutDetails('${c.cutNumber}')">${c.modelName}</h3>
+              <p class="text-[11px] text-gray-500">${c.fabricType || 'قماش عام'} • ${c.color || 'ألوان متعددة'}</p>
+            </div>
           </div>
-          <span class="text-[11px] font-bold px-2 py-1 rounded-full border ${statusColor}">
+          <span class="text-[11px] font-bold px-2 py-1 rounded-full border ${statusColor} shrink-0">
             ${stats.status}
           </span>
         </div>
@@ -652,7 +944,7 @@ function renderCutsView() {
         <!-- Metrics Grid -->
         <div class="grid grid-cols-3 gap-2 bg-gray-50 p-2.5 rounded-lg border border-gray-100 text-center text-xs">
           <div>
-            <span class="text-gray-400 block text-[10px]">إجمالي الوارد</span>
+            <span class="text-gray-400 block text-[10px]">الكمية المقصوصة</span>
             <strong class="text-green-700 font-bold">${stats.inPieces.toLocaleString()}</strong>
           </div>
           <div>
@@ -678,8 +970,12 @@ function renderCutsView() {
 
         <!-- Footer Actions -->
         <div class="pt-2 border-t border-gray-100 flex items-center justify-between text-xs">
-          <span class="text-gray-400 text-[11px]">الموسم: ${c.season || '2025'}</span>
-          <div class="flex items-center gap-1">
+          <span class="text-gray-400 text-[11px]">${c.stage ? 'المرحلة: ' + c.stage : 'الموسم: ' + (c.season || '2025')}</span>
+          <div class="flex items-center gap-1.5">
+            <button onclick="viewCutDetails('${c.cutNumber}')" class="text-excel-700 hover:text-excel-900 px-2 py-1 bg-excel-50 hover:bg-excel-100 rounded text-xs font-bold transition flex items-center gap-1" title="عرض تفاصيل القصة وجداول الراقات">
+              <i class="fa-solid fa-eye"></i>
+              <span>التفاصيل</span>
+            </button>
             <button onclick="openEditCutModal('${c.cutNumber}')" class="text-blue-600 hover:text-blue-800 p-1.5 rounded hover:bg-blue-50 transition" title="تعديل">
               <i class="fa-solid fa-pen-to-square"></i>
             </button>
@@ -1399,8 +1695,225 @@ function handleStockOutSubmit(e) {
 }
 
 // ==========================================
-// 11. CUTS & TRANSACTIONS CRUD
+// 11. CUTS & DYNAMIC SPEC SHEET CRUD
 // ==========================================
+
+// Dynamic Tables logic for Blouse and Pants Rolls
+function initAddCutModal() {
+  currentBlouseRows = [
+    { id: 1, rollNumber: "R-B01", layers: 80, weightKg: 28.5, notes: "" }
+  ];
+  currentPantsRows = [
+    { id: 1, rollNumber: "R-P01", layers: 80, weightKg: 34.0, notes: "" }
+  ];
+
+  document.getElementById('editCutOriginalNumber').value = '';
+  document.getElementById('cutNumberInput').disabled = false;
+  document.getElementById('cutModalTitle').textContent = 'تسجيل ورقة قص وتشغيل قصة جديدة';
+  document.getElementById('cutSubmitBtnText').textContent = 'حفظ ومزامنة القصة';
+  
+  // Clear image
+  removeCutImage();
+
+  // Set default date to today
+  const dateInput = document.getElementById('cutDateInput');
+  if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
+
+  renderDynamicBlouseTable();
+  renderDynamicPantsTable();
+  recalculateCutSheetTotals();
+}
+
+function addBlouseRow() {
+  const nextIdx = currentBlouseRows.length + 1;
+  currentBlouseRows.push({
+    id: Date.now() + Math.random(),
+    rollNumber: `R-B${nextIdx < 10 ? '0' + nextIdx : nextIdx}`,
+    layers: 0,
+    weightKg: 0,
+    notes: ""
+  });
+  renderDynamicBlouseTable();
+  recalculateCutSheetTotals();
+}
+
+function removeBlouseRow(index) {
+  if (currentBlouseRows.length <= 1) {
+    showToast('يجب الاحتفاظ بسطر رول واحد على الأقل', 'info');
+    return;
+  }
+  currentBlouseRows.splice(index, 1);
+  renderDynamicBlouseTable();
+  recalculateCutSheetTotals();
+}
+
+function updateBlouseRowField(index, field, value) {
+  if (currentBlouseRows[index]) {
+    if (field === 'layers' || field === 'weightKg') {
+      currentBlouseRows[index][field] = Number(value) || 0;
+    } else {
+      currentBlouseRows[index][field] = value;
+    }
+    recalculateCutSheetTotals();
+  }
+}
+
+function renderDynamicBlouseTable() {
+  const tbody = document.getElementById('blouseRowsBody');
+  if (!tbody) return;
+
+  tbody.innerHTML = currentBlouseRows.map((row, idx) => `
+    <tr class="hover:bg-emerald-50/40 transition">
+      <td class="p-2 text-center text-gray-500 font-mono">${idx + 1}</td>
+      <td class="p-2">
+        <input type="text" value="${escapeHtml(row.rollNumber || '')}" oninput="updateBlouseRowField(${idx}, 'rollNumber', this.value)" placeholder="رقم الرول" class="w-full bg-white border border-gray-300 rounded p-1 text-xs focus:ring-1 focus:ring-emerald-600">
+      </td>
+      <td class="p-2">
+        <input type="number" min="0" value="${row.layers || ''}" oninput="updateBlouseRowField(${idx}, 'layers', this.value)" placeholder="0" class="w-full bg-white border border-gray-300 rounded p-1 text-center font-bold text-xs focus:ring-1 focus:ring-emerald-600">
+      </td>
+      <td class="p-2">
+        <input type="number" min="0" step="0.01" value="${row.weightKg || ''}" oninput="updateBlouseRowField(${idx}, 'weightKg', this.value)" placeholder="0.0" class="w-full bg-white border border-gray-300 rounded p-1 text-center font-bold text-emerald-800 text-xs focus:ring-1 focus:ring-emerald-600">
+      </td>
+      <td class="p-2">
+        <input type="text" value="${escapeHtml(row.notes || '')}" oninput="updateBlouseRowField(${idx}, 'notes', this.value)" placeholder="ملاحظة..." class="w-full bg-white border border-gray-300 rounded p-1 text-xs focus:ring-1 focus:ring-emerald-600">
+      </td>
+      <td class="p-2 text-center">
+        <button type="button" onclick="removeBlouseRow(${idx})" class="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition" title="حذف السطر">
+          <i class="fa-solid fa-trash-can"></i>
+        </button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function addPantsRow() {
+  const nextIdx = currentPantsRows.length + 1;
+  currentPantsRows.push({
+    id: Date.now() + Math.random(),
+    rollNumber: `R-P${nextIdx < 10 ? '0' + nextIdx : nextIdx}`,
+    layers: 0,
+    weightKg: 0,
+    notes: ""
+  });
+  renderDynamicPantsTable();
+  recalculateCutSheetTotals();
+}
+
+function removePantsRow(index) {
+  if (currentPantsRows.length <= 1) {
+    showToast('يجب الاحتفاظ بسطر رول واحد على الأقل', 'info');
+    return;
+  }
+  currentPantsRows.splice(index, 1);
+  renderDynamicPantsTable();
+  recalculateCutSheetTotals();
+}
+
+function updatePantsRowField(index, field, value) {
+  if (currentPantsRows[index]) {
+    if (field === 'layers' || field === 'weightKg') {
+      currentPantsRows[index][field] = Number(value) || 0;
+    } else {
+      currentPantsRows[index][field] = value;
+    }
+    recalculateCutSheetTotals();
+  }
+}
+
+function renderDynamicPantsTable() {
+  const tbody = document.getElementById('pantsRowsBody');
+  if (!tbody) return;
+
+  tbody.innerHTML = currentPantsRows.map((row, idx) => `
+    <tr class="hover:bg-blue-50/40 transition">
+      <td class="p-2 text-center text-gray-500 font-mono">${idx + 1}</td>
+      <td class="p-2">
+        <input type="text" value="${escapeHtml(row.rollNumber || '')}" oninput="updatePantsRowField(${idx}, 'rollNumber', this.value)" placeholder="رقم الرول" class="w-full bg-white border border-gray-300 rounded p-1 text-xs focus:ring-1 focus:ring-blue-600">
+      </td>
+      <td class="p-2">
+        <input type="number" min="0" value="${row.layers || ''}" oninput="updatePantsRowField(${idx}, 'layers', this.value)" placeholder="0" class="w-full bg-white border border-gray-300 rounded p-1 text-center font-bold text-xs focus:ring-1 focus:ring-blue-600">
+      </td>
+      <td class="p-2">
+        <input type="number" min="0" step="0.01" value="${row.weightKg || ''}" oninput="updatePantsRowField(${idx}, 'weightKg', this.value)" placeholder="0.0" class="w-full bg-white border border-gray-300 rounded p-1 text-center font-bold text-blue-800 text-xs focus:ring-1 focus:ring-blue-600">
+      </td>
+      <td class="p-2">
+        <input type="text" value="${escapeHtml(row.notes || '')}" oninput="updatePantsRowField(${idx}, 'notes', this.value)" placeholder="ملاحظة..." class="w-full bg-white border border-gray-300 rounded p-1 text-xs focus:ring-1 focus:ring-blue-600">
+      </td>
+      <td class="p-2 text-center">
+        <button type="button" onclick="removePantsRow(${idx})" class="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition" title="حذف السطر">
+          <i class="fa-solid fa-trash-can"></i>
+        </button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function recalculateCutSheetTotals() {
+  const bLayers = currentBlouseRows.reduce((sum, r) => sum + (Number(r.layers) || 0), 0);
+  const bWeight = currentBlouseRows.reduce((sum, r) => sum + (Number(r.weightKg) || 0), 0);
+  const pLayers = currentPantsRows.reduce((sum, r) => sum + (Number(r.layers) || 0), 0);
+  const pWeight = currentPantsRows.reduce((sum, r) => sum + (Number(r.weightKg) || 0), 0);
+
+  const totalRolls = currentBlouseRows.length + currentPantsRows.length;
+  const totalWeight = bWeight + pWeight;
+  const totalLayers = bLayers + pLayers;
+
+  const bLayersEl = document.getElementById('blouseTotalLayers');
+  const bWeightEl = document.getElementById('blouseTotalWeight');
+  const pLayersEl = document.getElementById('pantsTotalLayers');
+  const pWeightEl = document.getElementById('pantsTotalWeight');
+
+  const gRollsEl = document.getElementById('grandTotalRolls');
+  const gWeightEl = document.getElementById('grandTotalWeight');
+  const gLayersEl = document.getElementById('grandTotalLayers');
+
+  if (bLayersEl) bLayersEl.textContent = `${bLayers.toLocaleString()} راق`;
+  if (bWeightEl) bWeightEl.textContent = `${bWeight.toFixed(2)} كجم`;
+  if (pLayersEl) pLayersEl.textContent = `${pLayers.toLocaleString()} راق`;
+  if (pWeightEl) pWeightEl.textContent = `${pWeight.toFixed(2)} كجم`;
+
+  if (gRollsEl) gRollsEl.textContent = `${totalRolls} رول`;
+  if (gWeightEl) gWeightEl.textContent = `${totalWeight.toFixed(2)} كجم`;
+  if (gLayersEl) gLayersEl.textContent = `${totalLayers.toLocaleString()} راق`;
+}
+
+// Image handling for model
+function handleCutImageUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  if (file.size > 2 * 1024 * 1024) {
+    showToast('حجم الصورة كبير جداً، يفضل أن يكون أقل من 2 ميجابايت', 'error');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const base64 = e.target.result;
+    document.getElementById('cutImageBase64').value = base64;
+    const preview = document.getElementById('cutImagePreview');
+    const container = document.getElementById('imagePreviewContainer');
+    const removeBtn = document.getElementById('removeImageBtn');
+    if (preview) preview.src = base64;
+    if (container) container.classList.remove('hidden');
+    if (removeBtn) removeBtn.classList.remove('hidden');
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeCutImage() {
+  const base64Input = document.getElementById('cutImageBase64');
+  const fileInput = document.getElementById('cutImageFileInput');
+  const preview = document.getElementById('cutImagePreview');
+  const container = document.getElementById('imagePreviewContainer');
+  const removeBtn = document.getElementById('removeImageBtn');
+
+  if (base64Input) base64Input.value = '';
+  if (fileInput) fileInput.value = '';
+  if (preview) preview.src = '';
+  if (container) container.classList.add('hidden');
+  if (removeBtn) removeBtn.classList.add('hidden');
+}
 
 function handleAddCutSubmit(e) {
   e.preventDefault();
@@ -1408,14 +1921,51 @@ function handleAddCutSubmit(e) {
   const originalNumber = document.getElementById('editCutOriginalNumber').value;
   const cutNumber = document.getElementById('cutNumberInput').value.trim().toUpperCase();
   const modelName = document.getElementById('cutModelInput').value.trim();
+  const date = document.getElementById('cutDateInput').value || new Date().toISOString().split('T')[0];
+  const supplier = document.getElementById('cutSupplierInput').value.trim();
+  const pieces = Number(document.getElementById('cutPiecesCountInput').value) || 0;
+  const sizes = document.getElementById('cutSizesInput').value.trim();
   const fabricType = document.getElementById('cutFabricInput').value.trim();
   const color = document.getElementById('cutColorInput').value.trim();
   const season = document.getElementById('cutSeasonInput').value.trim();
-  const targetPieces = Number(document.getElementById('cutTargetPiecesInput').value) || 0;
+  const stage = document.getElementById('cutProductionStageInput').value || 'بالمخزن';
   const notes = document.getElementById('cutNotesInput').value.trim();
+  const imageBase64 = document.getElementById('cutImageBase64').value;
+
+  // Blouse specs
+  const blouseSpecs = {
+    length: Number(document.getElementById('blouseSpecLength').value) || 0,
+    width: Number(document.getElementById('blouseSpecWidth').value) || 0,
+    cut: document.getElementById('blouseSpecCut').value.trim(),
+    coloring: document.getElementById('blouseSpecColoring').value.trim(),
+    rib: Number(document.getElementById('blouseSpecRib').value) || 0,
+    notes: document.getElementById('blouseSpecNotes').value.trim(),
+    rolls: [...currentBlouseRows]
+  };
+
+  // Pants specs
+  const pantsSpecs = {
+    length: Number(document.getElementById('pantsSpecLength').value) || 0,
+    width: Number(document.getElementById('pantsSpecWidth').value) || 0,
+    cut: document.getElementById('pantsSpecCut').value.trim(),
+    coloring: document.getElementById('pantsSpecColoring').value.trim(),
+    rib: Number(document.getElementById('pantsSpecRib').value) || 0,
+    notes: document.getElementById('pantsSpecNotes').value.trim(),
+    rolls: [...currentPantsRows]
+  };
+
+  const bWeight = currentBlouseRows.reduce((sum, r) => sum + (Number(r.weightKg) || 0), 0);
+  const pWeight = currentPantsRows.reduce((sum, r) => sum + (Number(r.weightKg) || 0), 0);
+  const totalWeight = Number((bWeight + pWeight).toFixed(2));
+  const totalRolls = currentBlouseRows.length + currentPantsRows.length;
 
   if (!cutNumber || !modelName) {
     showToast('يرجى إدخال كود القصة واسم الموديل', 'error');
+    return;
+  }
+
+  if (pieces <= 0) {
+    showToast('يرجى إدخال عدد القطع المقصوصة بشكل صحيح', 'error');
     return;
   }
 
@@ -1424,36 +1974,77 @@ function handleAddCutSubmit(e) {
     const cut = appState.cuts.find(c => c.cutNumber === originalNumber);
     if (cut) {
       cut.modelName = modelName;
+      cut.date = date;
+      cut.supplier = supplier;
+      cut.targetPieces = pieces;
+      cut.sizes = sizes;
       cut.fabricType = fabricType;
       cut.color = color;
       cut.season = season;
-      cut.targetPieces = targetPieces;
+      cut.stage = stage;
       cut.notes = notes;
+      if (imageBase64) cut.image = imageBase64;
+      cut.blouseSpecs = blouseSpecs;
+      cut.pantsSpecs = pantsSpecs;
+      cut.totalWeightKg = totalWeight;
+      cut.totalRolls = totalRolls;
     }
-    showToast(`تم حفظ تعديل بيانات القصة ${originalNumber}`, 'success');
+    showToast(`تم حفظ تعديل ورقة القصة ${originalNumber} بنجاح`, 'success');
   } else {
     // Add new cut
     if (appState.cuts.some(c => c.cutNumber === cutNumber)) {
       showToast('كود هذه القصة مسجل بالفعل مسبقاً!', 'error');
       return;
     }
-    appState.cuts.push({
+
+    const newCutObj = {
       cutNumber,
       modelName,
+      date,
+      supplier,
+      targetPieces: pieces,
+      sizes,
       fabricType,
       color,
       season: season || 'صيف 2025',
-      targetPieces,
+      stage,
       notes,
+      image: imageBase64 || '',
+      blouseSpecs,
+      pantsSpecs,
+      totalWeightKg: totalWeight,
+      totalRolls,
       createdAt: new Date().toISOString().split('T')[0]
+    };
+
+    appState.cuts.push(newCutObj);
+
+    // Automatically create initial "وارد" warehouse transaction for this cutting job
+    appState.transactions.push({
+      id: `TX-IN-${Date.now()}`,
+      cutNumber,
+      modelName,
+      type: 'وارد',
+      stage: 'قص',
+      pieces,
+      rolls: totalRolls,
+      weightKg: totalWeight,
+      party: supplier || 'عنبر ومقصدار المصنع',
+      responsible: 'مسؤول عنبر القص',
+      date: date || new Date().toISOString().split('T')[0],
+      docNumber: `CUT-SHEET-${cutNumber}`,
+      notes: `تسجيل قصة جديدة مع جداول أوزان وراقات البلوزة والبنطلون. ${notes}`
     });
-    showToast(`تمت إضافة كود القصة ${cutNumber} بنجاح`, 'success');
+
+    showToast(`تم تسجيل القصة ${cutNumber} وتوليد ورقة القص وإدخال الرصيد للمخزن بنجاح`, 'success');
   }
 
   saveData();
   closeModal('addCutModal');
   document.getElementById('addCutForm').reset();
   renderCutsView();
+  renderDashboard();
+  renderExcelSheet();
 }
 
 function openEditCutModal(cutNumber) {
@@ -1463,15 +2054,211 @@ function openEditCutModal(cutNumber) {
   document.getElementById('editCutOriginalNumber').value = cut.cutNumber;
   document.getElementById('cutNumberInput').value = cut.cutNumber;
   document.getElementById('cutNumberInput').disabled = true;
-  document.getElementById('cutModelInput').value = cut.modelName;
+  document.getElementById('cutModelInput').value = cut.modelName || '';
+  document.getElementById('cutDateInput').value = cut.date || cut.createdAt || '';
+  document.getElementById('cutSupplierInput').value = cut.supplier || '';
+  document.getElementById('cutPiecesCountInput').value = cut.targetPieces || 0;
+  document.getElementById('cutSizesInput').value = cut.sizes || '';
   document.getElementById('cutFabricInput').value = cut.fabricType || '';
   document.getElementById('cutColorInput').value = cut.color || '';
   document.getElementById('cutSeasonInput').value = cut.season || '';
-  document.getElementById('cutTargetPiecesInput').value = cut.targetPieces || 0;
+  document.getElementById('cutProductionStageInput').value = cut.stage || 'بالمخزن';
   document.getElementById('cutNotesInput').value = cut.notes || '';
-  document.getElementById('cutModalTitle').textContent = `تعديل بيانات القصة ${cut.cutNumber}`;
+
+  // Image preview
+  if (cut.image) {
+    document.getElementById('cutImageBase64').value = cut.image;
+    document.getElementById('cutImagePreview').src = cut.image;
+    document.getElementById('imagePreviewContainer').classList.remove('hidden');
+    document.getElementById('removeImageBtn').classList.remove('hidden');
+  } else {
+    removeCutImage();
+  }
+
+  // Blouse specs
+  const b = cut.blouseSpecs || {};
+  document.getElementById('blouseSpecLength').value = b.length || '';
+  document.getElementById('blouseSpecWidth').value = b.width || '';
+  document.getElementById('blouseSpecCut').value = b.cut || '';
+  document.getElementById('blouseSpecColoring').value = b.coloring || '';
+  document.getElementById('blouseSpecRib').value = b.rib || '';
+  document.getElementById('blouseSpecNotes').value = b.notes || '';
+  currentBlouseRows = (b.rolls && b.rolls.length > 0) ? JSON.parse(JSON.stringify(b.rolls)) : [
+    { id: 1, rollNumber: "R-B01", layers: 0, weightKg: 0, notes: "" }
+  ];
+
+  // Pants specs
+  const p = cut.pantsSpecs || {};
+  document.getElementById('pantsSpecLength').value = p.length || '';
+  document.getElementById('pantsSpecWidth').value = p.width || '';
+  document.getElementById('pantsSpecCut').value = p.cut || '';
+  document.getElementById('pantsSpecColoring').value = p.coloring || '';
+  document.getElementById('pantsSpecRib').value = p.rib || '';
+  document.getElementById('pantsSpecNotes').value = p.notes || '';
+  currentPantsRows = (p.rolls && p.rolls.length > 0) ? JSON.parse(JSON.stringify(p.rolls)) : [
+    { id: 1, rollNumber: "R-P01", layers: 0, weightKg: 0, notes: "" }
+  ];
+
+  document.getElementById('cutModalTitle').textContent = `تعديل ورقة ومواصفات القصة ${cut.cutNumber}`;
+  document.getElementById('cutSubmitBtnText').textContent = 'حفظ التعديلات والمزامنة';
+
+  renderDynamicBlouseTable();
+  renderDynamicPantsTable();
+  recalculateCutSheetTotals();
 
   openModal('addCutModal');
+}
+
+// View Cut Detail Sheet Modal
+function viewCutDetails(cutNumber) {
+  const cut = appState.cuts.find(c => c.cutNumber === cutNumber);
+  if (!cut) return;
+
+  const stats = getCutStats(cutNumber);
+  const modalContent = document.getElementById('cutDetailsModalContent');
+  if (!modalContent) return;
+
+  const b = cut.blouseSpecs || {};
+  const p = cut.pantsSpecs || {};
+  const bRolls = b.rolls || [];
+  const pRolls = p.rolls || [];
+
+  const bTotalLayers = bRolls.reduce((s, r) => s + (Number(r.layers) || 0), 0);
+  const bTotalWeight = bRolls.reduce((s, r) => s + (Number(r.weightKg) || 0), 0);
+  const pTotalLayers = pRolls.reduce((s, r) => s + (Number(r.layers) || 0), 0);
+  const pTotalWeight = pRolls.reduce((s, r) => s + (Number(r.weightKg) || 0), 0);
+
+  modalContent.innerHTML = `
+    <!-- Header Summary Card -->
+    <div class="bg-gradient-to-r from-gray-50 to-excel-50 p-4 rounded-xl border border-gray-200 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-4">
+        ${cut.image ? `
+          <img src="${cut.image}" alt="${cut.modelName}" class="w-20 h-20 object-cover rounded-xl border-2 border-excel-600 shadow">
+        ` : `
+          <div class="w-20 h-20 rounded-xl bg-excel-100 text-excel-700 flex items-center justify-center text-3xl font-black border border-excel-300">
+            <i class="fa-solid fa-shirt"></i>
+          </div>
+        `}
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-mono font-black text-excel-700 bg-white px-2.5 py-0.5 rounded border border-excel-300">${cut.cutNumber}</span>
+            <span class="text-xs px-2.5 py-0.5 rounded-full font-bold bg-amber-100 text-amber-900 border border-amber-300">${cut.stage || 'بالمخزن'}</span>
+          </div>
+          <h2 class="text-lg font-black text-gray-900 mt-1">${cut.modelName}</h2>
+          <p class="text-xs text-gray-500">تاريخ القص: <strong>${cut.date || cut.createdAt || 'غير محدد'}</strong> • المورد: <strong>${cut.supplier || 'الورشة المركزية'}</strong></p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-3 gap-3 text-center bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
+        <div>
+          <span class="text-gray-400 block text-[11px]">الكمية المقصوصة</span>
+          <strong class="text-base text-gray-800">${(cut.targetPieces || 0).toLocaleString()} ق</strong>
+        </div>
+        <div>
+          <span class="text-gray-400 block text-[11px]">المنصرف حتى الآن</span>
+          <strong class="text-base text-red-600">${stats.outPieces.toLocaleString()} ق</strong>
+        </div>
+        <div>
+          <span class="text-gray-400 block text-[11px]">الرصيد المتبقي</span>
+          <strong class="text-base text-excel-700 font-black">${stats.balancePieces.toLocaleString()} ق</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- Specifications Grid -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-gray-50 p-3.5 rounded-xl border border-gray-200 text-xs">
+      <div><span class="text-gray-400 block text-[11px]">المقاسات:</span><strong>${cut.sizes || 'غير مسجلة'}</strong></div>
+      <div><span class="text-gray-400 block text-[11px]">نوع القماش:</span><strong>${cut.fabricType || 'قماش عام'}</strong></div>
+      <div><span class="text-gray-400 block text-[11px]">اللون العام:</span><strong>${cut.color || 'ألوان متعددة'}</strong></div>
+      <div><span class="text-gray-400 block text-[11px]">الموسم:</span><strong>${cut.season || '2025'}</strong></div>
+    </div>
+
+    <!-- Blouse Details Section -->
+    <div class="bg-white rounded-xl border border-emerald-300 overflow-hidden shadow-sm">
+      <div class="bg-emerald-50 px-4 py-2.5 border-b border-emerald-200 flex justify-between items-center font-bold text-emerald-950">
+        <span class="flex items-center gap-2"><i class="fa-solid fa-vest text-emerald-600"></i> تفاصيل ورولات قماش البلوزة</span>
+        <span class="text-xs bg-white px-2 py-0.5 rounded text-emerald-800 border border-emerald-200">${bRolls.length} رول • ${bTotalWeight.toFixed(2)} كجم • ${bTotalLayers} راق</span>
+      </div>
+      <div class="p-3 bg-gray-50 grid grid-cols-3 sm:grid-cols-5 gap-2 text-[11px] border-b border-gray-200">
+        <div><span class="text-gray-500">الطول:</span> <strong>${b.length || '-'} سم</strong></div>
+        <div><span class="text-gray-500">العرض:</span> <strong>${b.width || '-'} سم</strong></div>
+        <div><span class="text-gray-500">القصة:</span> <strong>${b.cut || '-'}</strong></div>
+        <div><span class="text-gray-500">التلوين:</span> <strong>${b.coloring || '-'}</strong></div>
+        <div><span class="text-gray-500">الريب:</span> <strong>${b.rib || 0} كجم</strong></div>
+      </div>
+      <table class="w-full text-right text-xs">
+        <thead class="bg-gray-100 text-gray-700 font-bold border-b border-gray-200">
+          <tr>
+            <th class="p-2 w-10 text-center">م</th>
+            <th class="p-2">رقم الرول</th>
+            <th class="p-2 text-center">عدد الراقات</th>
+            <th class="p-2 text-center">الوزن (كجم)</th>
+            <th class="p-2">ملاحظات</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          ${bRolls.map((r, i) => `
+            <tr>
+              <td class="p-2 text-center text-gray-400 font-mono">${i + 1}</td>
+              <td class="p-2 font-bold">${escapeHtml(r.rollNumber || '')}</td>
+              <td class="p-2 text-center font-bold">${r.layers || 0}</td>
+              <td class="p-2 text-center font-bold text-emerald-800">${(Number(r.weightKg) || 0).toFixed(2)}</td>
+              <td class="p-2 text-gray-500">${escapeHtml(r.notes || '-')}</td>
+            </tr>
+          `).join('') || '<tr><td colspan="5" class="p-3 text-center text-gray-400">لا توجد رولات مسجلة</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pants Details Section -->
+    <div class="bg-white rounded-xl border border-blue-300 overflow-hidden shadow-sm">
+      <div class="bg-blue-50 px-4 py-2.5 border-b border-blue-200 flex justify-between items-center font-bold text-blue-950">
+        <span class="flex items-center gap-2"><i class="fa-solid fa-pants text-blue-600"></i> تفاصيل ورولات قماش البنطلون</span>
+        <span class="text-xs bg-white px-2 py-0.5 rounded text-blue-800 border border-blue-200">${pRolls.length} رول • ${pTotalWeight.toFixed(2)} كجم • ${pTotalLayers} راق</span>
+      </div>
+      <div class="p-3 bg-gray-50 grid grid-cols-3 sm:grid-cols-5 gap-2 text-[11px] border-b border-gray-200">
+        <div><span class="text-gray-500">الطول:</span> <strong>${p.length || '-'} سم</strong></div>
+        <div><span class="text-gray-500">العرض:</span> <strong>${p.width || '-'} سم</strong></div>
+        <div><span class="text-gray-500">القصة:</span> <strong>${p.cut || '-'}</strong></div>
+        <div><span class="text-gray-500">التلوين:</span> <strong>${p.coloring || '-'}</strong></div>
+        <div><span class="text-gray-500">الريب/أستك:</span> <strong>${p.rib || 0} كجم</strong></div>
+      </div>
+      <table class="w-full text-right text-xs">
+        <thead class="bg-gray-100 text-gray-700 font-bold border-b border-gray-200">
+          <tr>
+            <th class="p-2 w-10 text-center">م</th>
+            <th class="p-2">رقم الرول</th>
+            <th class="p-2 text-center">عدد الراقات</th>
+            <th class="p-2 text-center">الوزن (كجم)</th>
+            <th class="p-2">ملاحظات</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          ${pRolls.map((r, i) => `
+            <tr>
+              <td class="p-2 text-center text-gray-400 font-mono">${i + 1}</td>
+              <td class="p-2 font-bold">${escapeHtml(r.rollNumber || '')}</td>
+              <td class="p-2 text-center font-bold">${r.layers || 0}</td>
+              <td class="p-2 text-center font-bold text-blue-800">${(Number(r.weightKg) || 0).toFixed(2)}</td>
+              <td class="p-2 text-gray-500">${escapeHtml(r.notes || '-')}</td>
+            </tr>
+          `).join('') || '<tr><td colspan="5" class="p-3 text-center text-gray-400">لا توجد رولات مسجلة</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+
+    ${cut.notes ? `
+      <div class="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-xs">
+        <strong>ملاحظات عامة:</strong> ${escapeHtml(cut.notes)}
+      </div>
+    ` : ''}
+  `;
+
+  openModal('cutDetailsModal');
+}
+
+function printCutDetailsSheet() {
+  window.print();
 }
 
 function deleteCut(cutNumber) {
@@ -1767,6 +2554,10 @@ function openModal(modalId) {
     if (modalId === 'stockOutModal') {
       populateCutsDatalists();
       handleOutCutSelected();
+    }
+
+    if (modalId === 'addCutModal' && !document.getElementById('editCutOriginalNumber')?.value) {
+      initAddCutModal();
     }
   }
 }
