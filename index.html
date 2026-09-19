@@ -1140,26 +1140,57 @@
 
       <form id="stockInForm" onsubmit="handleStockInSubmit(event)" class="p-5 space-y-3.5 text-xs">
         
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block font-bold text-gray-700 mb-1">رقم القصة *</label>
-            <input type="text" id="inCutNumber" list="cutsListDatalist" required placeholder="مثال: CUT-101" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 font-bold focus:ring-2 focus:ring-stockin focus:outline-none" oninput="autoFillModelName(this.value, 'inModelName')">
-            <datalist id="cutsListDatalist"></datalist>
+        <!-- Master Cut Selection (Primary Reference) -->
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block font-bold text-gray-700">رقم القصة المسجلة (المرجع الرئيسي) *</label>
+            <button type="button" onclick="closeModal('stockInModal'); openModal('addCutModal');" class="text-[11px] text-emerald-700 hover:text-emerald-900 font-bold hover:underline flex items-center gap-1">
+              <i class="fa-solid fa-folder-plus"></i>
+              <span>+ قصة جديدة غير مسجلة؟</span>
+            </button>
           </div>
-          <div>
-            <label class="block font-bold text-gray-700 mb-1">اسم الموديل *</label>
-            <input type="text" id="inModelName" required placeholder="مثال: تيشرت أوفر سايز" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 font-semibold focus:ring-2 focus:ring-stockin focus:outline-none">
+          <select id="inCutNumberSelect" required onchange="handleInCutSelected()" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 font-bold text-sm focus:ring-2 focus:ring-stockin focus:outline-none">
+            <option value="">-- اختر القصة المسجلة بالمخزن --</option>
+          </select>
+        </div>
+
+        <!-- Master Cut Info Preview Banner -->
+        <div id="inCutInfoBanner" class="hidden bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <span class="font-mono font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-xs" id="inBannerCutCode">-</span>
+              <strong class="text-xs text-gray-800" id="inBannerModelName">-</strong>
+            </div>
+            <span class="text-[11px] text-emerald-700 font-bold" id="inBannerFabric">-</span>
+          </div>
+          <div class="grid grid-cols-3 gap-2 text-center text-[11px] bg-white p-2 rounded-lg border border-emerald-100">
+            <div>
+              <span class="text-gray-400 block text-[10px]">الكمية المقصوصة</span>
+              <strong class="text-gray-800 font-bold" id="inBannerTargetPieces">0 ق</strong>
+            </div>
+            <div>
+              <span class="text-gray-400 block text-[10px]">الوارد حتى الآن</span>
+              <strong class="text-emerald-700 font-bold" id="inBannerReceivedPieces">0 ق</strong>
+            </div>
+            <div>
+              <span class="text-gray-400 block text-[10px]">الرصيد المتبقي</span>
+              <strong class="text-excel-700 font-black" id="inBannerBalancePieces">0 ق</strong>
+            </div>
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">اسم الموديل</label>
+            <input type="text" id="inModelName" readonly placeholder="يتم تحديده تلقائياً من القصة" class="w-full bg-gray-100 border border-gray-300 rounded-lg p-2 font-semibold text-gray-700 focus:outline-none cursor-not-allowed">
+          </div>
           <div>
             <label class="block font-bold text-gray-700 mb-1">نوع القماش / الخامة</label>
-            <input type="text" id="inFabricType" placeholder="مثال: قطن سنجل ليكرا" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-stockin focus:outline-none">
+            <input type="text" id="inFabricType" readonly placeholder="من بطاقة القصة" class="w-full bg-gray-100 border border-gray-300 rounded-lg p-2 text-gray-700 focus:outline-none cursor-not-allowed">
           </div>
           <div>
             <label class="block font-bold text-gray-700 mb-1">اللون</label>
-            <input type="text" id="inColor" placeholder="مثال: أسود ملكي" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-stockin focus:outline-none">
+            <input type="text" id="inColor" readonly placeholder="من بطاقة القصة" class="w-full bg-gray-100 border border-gray-300 rounded-lg p-2 text-gray-700 focus:outline-none cursor-not-allowed">
           </div>
         </div>
 
@@ -1246,15 +1277,29 @@
           </select>
         </div>
 
-        <!-- Available Balance Info Banner -->
-        <div id="outCutBalanceBanner" class="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center justify-between">
-          <div>
-            <span class="text-xs text-amber-800 font-bold block">الرصيد الدفتري المتاح حالياً بالمخزن:</span>
-            <span id="outAvailablePiecesText" class="text-lg font-black text-amber-900">0 قطعة</span>
-            <span id="outAvailableRollsText" class="text-xs text-amber-700 mr-2">(0 ثوب)</span>
+        <!-- Available Balance Info Banner (Total Cut, Previously Issued, Available Remaining) -->
+        <div id="outCutBalanceBanner" class="bg-gray-50 border border-gray-200 rounded-xl p-3">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-mono font-bold bg-white text-gray-800 px-2.5 py-0.5 rounded border border-gray-300" id="outBannerCutCode">-</span>
+              <strong id="outModelNameBadge" class="text-xs font-bold text-gray-800">-</strong>
+            </div>
+            <span id="outStageBadge" class="text-[10px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">بالمخزن</span>
           </div>
-          <div class="text-left">
-            <span id="outModelNameBadge" class="inline-block bg-white text-gray-700 font-bold px-2.5 py-1 rounded text-xs shadow-sm border border-amber-200">-</span>
+
+          <div class="grid grid-cols-3 gap-2 text-center text-xs bg-white p-2.5 rounded-lg border border-gray-200 shadow-xs">
+            <div>
+              <span class="text-gray-400 block text-[10px]">إجمالي الوارد (Total Cut)</span>
+              <strong id="outTotalCutPiecesText" class="text-xs text-green-700 font-bold">0 ق</strong>
+            </div>
+            <div>
+              <span class="text-gray-400 block text-[10px]">المنصرف سابقاً للورش</span>
+              <strong id="outPreviouslyIssuedText" class="text-xs text-red-600 font-bold">0 ق</strong>
+            </div>
+            <div>
+              <span class="text-gray-400 block text-[10px]">الرصيد المتاح (Available)</span>
+              <strong id="outAvailablePiecesText" class="text-sm text-excel-700 font-black">0 ق</strong>
+            </div>
           </div>
         </div>
 
@@ -1263,8 +1308,17 @@
           <i class="fa-solid fa-triangle-exclamation text-lg text-red-600 mt-0.5 animate-bounce"></i>
           <div>
             <strong class="block font-black text-xs">تنبيه رقابي: لا يمكن إتمام عملية الصرف!</strong>
-            <p id="outErrorMessage" class="text-xs mt-0.5">الكمية المطلوبة أكبر من الرصيد الدفتري المتاح حالياً لهذه القصة.</p>
+            <p id="outErrorMessage" class="text-xs mt-0.5">الكمية المطلوبة أكبر من الرصيد المتبقي المتاح حالياً لهذه القصة بالمخزن.</p>
           </div>
+        </div>
+
+        <!-- LIVE VALID QUANTITY FEEDBACK BANNER -->
+        <div id="outValidBanner" class="hidden bg-emerald-50 border border-emerald-300 rounded-xl p-2.5 text-emerald-900 text-xs flex items-center justify-between">
+          <span class="flex items-center gap-1.5 font-bold">
+            <i class="fa-solid fa-circle-check text-emerald-600"></i>
+            <span>الكمية متوفرة ومسموح بصرفها</span>
+          </span>
+          <span id="outRemainingAfterDeduct" class="font-bold font-mono text-emerald-800">سيتبقى: 0 قطعة</span>
         </div>
 
         <div class="grid grid-cols-3 gap-3 bg-red-50/60 p-3 rounded-xl border border-red-200">

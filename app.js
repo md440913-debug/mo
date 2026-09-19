@@ -534,9 +534,12 @@ function getCutStats(cutNumber) {
     status = "منصرف جزئياً";
   }
 
+  const targetPieces = cut ? (Number(cut.targetPieces) || inPieces) : inPieces;
+
   return {
     cutNumber,
     modelName: cut ? cut.modelName : "",
+    targetPieces,
     inPieces,
     inRolls,
     inWeight,
@@ -1490,19 +1493,85 @@ function exportAuditToExcel() {
 // ==========================================
 
 function populateCutsDatalists() {
-  const datalist = document.getElementById('cutsListDatalist');
+  const selectIn = document.getElementById('inCutNumberSelect');
   const selectOut = document.getElementById('outCutNumberSelect');
 
+  // 1. Populate Stock-In Select with Master Cuts
+  if (selectIn) {
+    const currentVal = selectIn.value;
+    selectIn.innerHTML = '<option value="">-- اختر القصة المسجلة (المرجع الرئيسي) --</option>' + 
+      appState.cuts.map(c => {
+        const stats = getCutStats(c.cutNumber);
+        return `<option value="${c.cutNumber}">${c.cutNumber} - ${c.modelName} (الوارد: ${stats.inPieces.toLocaleString()} ق | المتبقي: ${stats.balancePieces.toLocaleString()} ق)</option>`;
+      }).join('');
+    if (currentVal && appState.cuts.some(c => c.cutNumber === currentVal)) {
+      selectIn.value = currentVal;
+    }
+  }
+
+  // 2. Populate Stock-Out Select with Master Cuts and Live Balances
+  if (selectOut) {
+    const currentVal = selectOut.value;
+    selectOut.innerHTML = '<option value="">-- اختر القصة المراد الصرف منها --</option>' + 
+      appState.cuts.map(c => {
+        const stats = getCutStats(c.cutNumber);
+        const isOutOfStock = stats.balancePieces <= 0;
+        const label = isOutOfStock 
+          ? `${c.cutNumber} - ${c.modelName} [نفد الرصيد بالكامل - 0 قطعة]`
+          : `${c.cutNumber} - ${c.modelName} (المتاح للصرف: ${stats.balancePieces.toLocaleString()} قطعة)`;
+        return `<option value="${c.cutNumber}" ${isOutOfStock ? 'class="text-gray-400 bg-gray-100"' : ''}>${label}</option>`;
+      }).join('');
+    if (currentVal && appState.cuts.some(c => c.cutNumber === currentVal)) {
+      selectOut.value = currentVal;
+    }
+  }
+
+  // 3. Optional fallback datalist if referenced
+  const datalist = document.getElementById('cutsListDatalist');
   if (datalist) {
     datalist.innerHTML = appState.cuts.map(c => `<option value="${c.cutNumber}">${c.modelName}</option>`).join('');
   }
+}
 
-  if (selectOut) {
-    selectOut.innerHTML = '<option value="">-- اختر القصة للصرف --</option>' + 
-      appState.cuts.map(c => {
-        const stats = getCutStats(c.cutNumber);
-        return `<option value="${c.cutNumber}">${c.cutNumber} - ${c.modelName} (المتاح: ${stats.balancePieces} قطعة)</option>`;
-      }).join('');
+function handleInCutSelected() {
+  const cutNumber = document.getElementById('inCutNumberSelect')?.value;
+  const banner = document.getElementById('inCutInfoBanner');
+  const modelInput = document.getElementById('inModelName');
+  const fabricInput = document.getElementById('inFabricType');
+  const colorInput = document.getElementById('inColor');
+
+  if (!cutNumber) {
+    if (banner) banner.classList.add('hidden');
+    if (modelInput) modelInput.value = '';
+    if (fabricInput) fabricInput.value = '';
+    if (colorInput) colorInput.value = '';
+    return;
+  }
+
+  const cut = appState.cuts.find(c => c.cutNumber === cutNumber);
+  const stats = getCutStats(cutNumber);
+
+  if (cut) {
+    if (modelInput) modelInput.value = cut.modelName || '';
+    if (fabricInput) fabricInput.value = cut.fabricType || '';
+    if (colorInput) colorInput.value = cut.color || '';
+  }
+
+  if (banner) {
+    banner.classList.remove('hidden');
+    const cutCodeEl = document.getElementById('inBannerCutCode');
+    const modelEl = document.getElementById('inBannerModelName');
+    const fabricEl = document.getElementById('inBannerFabric');
+    const targetEl = document.getElementById('inBannerTargetPieces');
+    const receivedEl = document.getElementById('inBannerReceivedPieces');
+    const balanceEl = document.getElementById('inBannerBalancePieces');
+
+    if (cutCodeEl) cutCodeEl.textContent = cutNumber;
+    if (modelEl) modelEl.textContent = cut ? cut.modelName : '-';
+    if (fabricEl) fabricEl.textContent = cut ? `${cut.fabricType || ''} ${cut.color ? '• ' + cut.color : ''}` : '-';
+    if (targetEl) targetEl.textContent = `${(cut?.targetPieces || stats.inPieces).toLocaleString()} ق`;
+    if (receivedEl) receivedEl.textContent = `${stats.inPieces.toLocaleString()} ق`;
+    if (balanceEl) balanceEl.textContent = `${stats.balancePieces.toLocaleString()} ق`;
   }
 }
 
@@ -1517,7 +1586,7 @@ function autoFillModelName(cutNumber, targetInputId) {
 function handleStockInSubmit(e) {
   e.preventDefault();
 
-  const cutNumber = document.getElementById('inCutNumber').value.trim().toUpperCase();
+  const cutNumber = (document.getElementById('inCutNumberSelect')?.value || document.getElementById('inCutNumber')?.value || '').trim().toUpperCase();
   const modelName = document.getElementById('inModelName').value.trim();
   const fabricType = document.getElementById('inFabricType').value.trim();
   const color = document.getElementById('inColor').value.trim();
@@ -1530,38 +1599,33 @@ function handleStockInSubmit(e) {
   const docNumber = document.getElementById('inDocNumber').value.trim() || `IN-${Date.now().toString().slice(-4)}`;
   const notes = document.getElementById('inNotes').value.trim();
 
-  if (!cutNumber || !modelName || pieces <= 0) {
-    showToast('يرجى ملء جميع الحقول الإلزامية وعدد القطع', 'error');
+  if (!cutNumber) {
+    showToast('يرجى اختيار كود القصة المسجلة (المرجع الرئيسي)', 'error');
     return;
   }
 
-  // Create Cut if not already registered
-  let existingCut = appState.cuts.find(c => c.cutNumber === cutNumber);
-  if (!existingCut) {
-    existingCut = {
-      cutNumber,
-      modelName,
-      fabricType,
-      color,
-      season: 'صيف 2025',
-      targetPieces: pieces,
-      notes: notes || 'تم إنشاؤها مع أول إذن وارد',
-      createdAt: date
-    };
-    appState.cuts.push(existingCut);
+  if (pieces <= 0) {
+    showToast('يرجى إدخال عدد القطع الواردة (أكبر من صفر)', 'error');
+    return;
   }
 
-  // Create In Transaction
+  let existingCut = appState.cuts.find(c => c.cutNumber === cutNumber);
+  if (!existingCut) {
+    showToast('كود القصة غير مسجل بالنظام! يرجى تسجيل كود القصة أولاً', 'error');
+    return;
+  }
+
+  // Create In Transaction linked to Master Cut
   const newTx = {
     id: `TX-IN-${Date.now()}`,
     cutNumber,
-    modelName,
+    modelName: existingCut.modelName,
     type: 'وارد',
     stage: 'قص',
     pieces,
     rolls,
     weightKg,
-    party: party || 'المقصدار',
+    party: party || 'عنبر ومقصدار المصنع',
     responsible: responsible || 'أمين المخزن',
     date,
     docNumber,
@@ -1573,74 +1637,132 @@ function handleStockInSubmit(e) {
 
   closeModal('stockInModal');
   document.getElementById('stockInForm').reset();
+  const inBanner = document.getElementById('inCutInfoBanner');
+  if (inBanner) inBanner.classList.add('hidden');
+
   showToast(`تم تسجيل الوارد بنجاح (+${pieces.toLocaleString()} قطعة لقصة ${cutNumber})`, 'success');
 
+  // Real-time refresh across all sheets and dashboard without page reload
+  populateCutsDatalists();
+  updateSidebarKPIs();
   renderDashboard();
   renderExcelSheet();
   renderCutsView();
+  renderTransactionsView();
 }
 
 function handleOutCutSelected() {
-  const cutNumber = document.getElementById('outCutNumberSelect').value;
-  const banner = document.getElementById('outCutBalanceBanner');
-  const availPiecesEl = document.getElementById('outAvailablePiecesText');
-  const availRollsEl = document.getElementById('outAvailableRollsText');
+  const cutNumber = document.getElementById('outCutNumberSelect')?.value;
+  const cutCodeBadge = document.getElementById('outBannerCutCode');
   const modelBadge = document.getElementById('outModelNameBadge');
+  const stageBadge = document.getElementById('outStageBadge');
+  const totalCutPiecesEl = document.getElementById('outTotalCutPiecesText');
+  const prevIssuedEl = document.getElementById('outPreviouslyIssuedText');
+  const availPiecesEl = document.getElementById('outAvailablePiecesText');
 
   if (!cutNumber) {
-    availPiecesEl.textContent = '0 قطعة';
-    availRollsEl.textContent = '(0 ثوب)';
-    modelBadge.textContent = '-';
+    if (cutCodeBadge) cutCodeBadge.textContent = '-';
+    if (modelBadge) modelBadge.textContent = '-';
+    if (stageBadge) stageBadge.textContent = 'بالمخزن';
+    if (totalCutPiecesEl) totalCutPiecesEl.textContent = '0 ق';
+    if (prevIssuedEl) prevIssuedEl.textContent = '0 ق';
+    if (availPiecesEl) availPiecesEl.textContent = '0 ق';
     validateOutgoingBalance();
     return;
   }
 
   const stats = getCutStats(cutNumber);
-  availPiecesEl.textContent = `${stats.balancePieces.toLocaleString()} قطعة`;
-  availRollsEl.textContent = `(${stats.balanceRolls.toLocaleString()} ثوب)`;
-  modelBadge.textContent = stats.modelName;
+  if (cutCodeBadge) cutCodeBadge.textContent = stats.cutNumber;
+  if (modelBadge) modelBadge.textContent = stats.modelName;
+  if (stageBadge) stageBadge.textContent = stats.status;
+  if (totalCutPiecesEl) totalCutPiecesEl.textContent = `${stats.inPieces.toLocaleString()} ق`;
+  if (prevIssuedEl) prevIssuedEl.textContent = `${stats.outPieces.toLocaleString()} ق`;
+  if (availPiecesEl) availPiecesEl.textContent = `${stats.balancePieces.toLocaleString()} ق`;
 
   validateOutgoingBalance();
 }
 
 /**
- * STRICT NEGATIVE BALANCE VALIDATION:
- * Prevents any stock out greater than the available balance
+ * STRICT QUANTITY VALIDATION & PREVENTION ENGINE:
+ * Validates requested quantity against remaining available balance.
+ * Displays live stats (Previously Issued, Remaining, Available) and blocks negative issuance.
  */
 function validateOutgoingBalance() {
   const cutNumber = document.getElementById('outCutNumberSelect')?.value;
   const piecesInput = document.getElementById('outPieces');
   const errorBanner = document.getElementById('outErrorBanner');
   const errorMsg = document.getElementById('outErrorMessage');
+  const validBanner = document.getElementById('outValidBanner');
+  const remainingAfterEl = document.getElementById('outRemainingAfterDeduct');
   const submitBtn = document.getElementById('confirmStockOutBtn');
 
   if (!cutNumber || !piecesInput) {
     if (errorBanner) errorBanner.classList.add('hidden');
-    if (submitBtn) submitBtn.disabled = false;
-    return true;
+    if (validBanner) validBanner.classList.add('hidden');
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+    return false;
   }
 
   const stats = getCutStats(cutNumber);
   const requestedPieces = Number(piecesInput.value) || 0;
 
-  if (requestedPieces > stats.balancePieces) {
-    errorBanner.classList.remove('hidden');
-    errorMsg.textContent = `عذراً! الكمية المطلوبة للصرف (${requestedPieces.toLocaleString()} قطعة) أكبر من الرصيد الدفتري المتاح حالياً بالمخزن (${stats.balancePieces.toLocaleString()} قطعة). لا يمكن تسجيل رصيد سالب!`;
-    submitBtn.disabled = true;
-    submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+  // Case 1: Empty or zero quantity
+  if (requestedPieces <= 0) {
+    if (errorBanner) errorBanner.classList.add('hidden');
+    if (validBanner) validBanner.classList.add('hidden');
+    piecesInput.classList.remove('border-red-500', 'ring-2', 'ring-red-400');
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
     return false;
-  } else {
-    errorBanner.classList.add('hidden');
+  }
+
+  // Case 2: Quantity exceeds remaining balance (Strict Prevention!)
+  if (requestedPieces > stats.balancePieces) {
+    if (errorBanner) {
+      errorBanner.classList.remove('hidden');
+      if (errorMsg) {
+        errorMsg.innerHTML = `الكمية المطلوبة للصرف (<strong>${requestedPieces.toLocaleString()}</strong> قطعة) تتجاوز الرصيد المتبقي المتاح حالياً (<strong>${stats.balancePieces.toLocaleString()}</strong> قطعة).<br><span class="text-[11px] text-red-700">إجمالي الوارد: ${stats.inPieces.toLocaleString()} ق • المنصرف سابقاً: ${stats.outPieces.toLocaleString()} ق</span>. يرجى تقليل الكمية فوراً!`;
+      }
+    }
+    if (validBanner) validBanner.classList.add('hidden');
+    piecesInput.classList.add('border-red-500', 'ring-2', 'ring-red-400');
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+    return false;
+  }
+
+  // Case 3: Valid quantity within available remaining stock
+  if (errorBanner) errorBanner.classList.add('hidden');
+  piecesInput.classList.remove('border-red-500', 'ring-2', 'ring-red-400');
+  piecesInput.classList.add('border-emerald-500');
+
+  const remainingAfter = stats.balancePieces - requestedPieces;
+  if (validBanner) {
+    validBanner.classList.remove('hidden');
+    if (remainingAfterEl) {
+      remainingAfterEl.textContent = `سيتبقى بعد الصرف: ${remainingAfter.toLocaleString()} قطعة`;
+    }
+  }
+
+  if (submitBtn) {
     submitBtn.disabled = false;
     submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-    return true;
   }
+
+  return true;
 }
 
 function handleStockOutSubmit(e) {
   e.preventDefault();
 
-  const cutNumber = document.getElementById('outCutNumberSelect').value;
+  const cutNumber = document.getElementById('outCutNumberSelect')?.value;
   const pieces = Number(document.getElementById('outPieces').value) || 0;
   const rolls = Number(document.getElementById('outRolls').value) || 0;
   const weightKg = Number(document.getElementById('outWeight').value) || 0;
@@ -1659,9 +1781,14 @@ function handleStockOutSubmit(e) {
 
   const stats = getCutStats(cutNumber);
 
-  // STRICT NEGATIVE BALANCE CHECK
-  if (pieces <= 0 || pieces > stats.balancePieces) {
-    showToast(`لا يمكن الصرف! الكمية المطلوبة أكبر من الرصيد المتاح (${stats.balancePieces})`, 'error');
+  // STRICT NEGATIVE BALANCE & QUANTITY VALIDATION
+  if (pieces <= 0) {
+    showToast('يرجى إدخال كمية الصرف المطلوبة (أكبر من صفر)', 'error');
+    return;
+  }
+
+  if (pieces > stats.balancePieces) {
+    showToast(`لا يمكن الصرف! الكمية المطلوبة (${pieces.toLocaleString()} قطعة) أكبر من الرصيد المتبقي المتاح (${stats.balancePieces.toLocaleString()} قطعة). المنصرف سابقاً: ${stats.outPieces.toLocaleString()} قطعة`, 'error');
     validateOutgoingBalance();
     return;
   }
@@ -1679,7 +1806,7 @@ function handleStockOutSubmit(e) {
     responsible: receiver || storekeeper,
     date,
     docNumber,
-    notes: `${notes} [المُسلّم: ${storekeeper}]`
+    notes: notes ? `${notes} [المُسلّم: ${storekeeper}]` : `[المُسلّم: ${storekeeper}]`
   };
 
   appState.transactions.push(newTx);
@@ -1687,11 +1814,18 @@ function handleStockOutSubmit(e) {
 
   closeModal('stockOutModal');
   document.getElementById('stockOutForm').reset();
-  showToast(`تم تسجيل إذن الصرف بنجاح (-${pieces.toLocaleString()} قطعة لقصة ${cutNumber})`, 'success');
+  const validBanner = document.getElementById('outValidBanner');
+  if (validBanner) validBanner.classList.add('hidden');
 
+  showToast(`تم تسجيل إذن الصرف بنجاح (-${pieces.toLocaleString()} قطعة للورشة لقصة ${cutNumber})`, 'success');
+
+  // Real-time refresh across all views and dropdowns without page reload
+  populateCutsDatalists();
+  updateSidebarKPIs();
   renderDashboard();
   renderExcelSheet();
   renderCutsView();
+  renderTransactionsView();
 }
 
 // ==========================================
@@ -1988,6 +2122,13 @@ function handleAddCutSubmit(e) {
       cut.pantsSpecs = pantsSpecs;
       cut.totalWeightKg = totalWeight;
       cut.totalRolls = totalRolls;
+
+      // Keep referential integrity across all linked warehouse transactions
+      appState.transactions.forEach(t => {
+        if (t.cutNumber === originalNumber) {
+          t.modelName = modelName;
+        }
+      });
     }
     showToast(`تم حفظ تعديل ورقة القصة ${originalNumber} بنجاح`, 'success');
   } else {
@@ -2042,9 +2183,12 @@ function handleAddCutSubmit(e) {
   saveData();
   closeModal('addCutModal');
   document.getElementById('addCutForm').reset();
+  populateCutsDatalists();
+  updateSidebarKPIs();
   renderCutsView();
   renderDashboard();
   renderExcelSheet();
+  renderTransactionsView();
 }
 
 function openEditCutModal(cutNumber) {
@@ -2270,6 +2414,9 @@ function deleteCut(cutNumber) {
     renderCutsView();
     renderDashboard();
     renderExcelSheet();
+    renderTransactionsView();
+    populateCutsDatalists();
+    updateSidebarKPIs();
   }
 }
 
@@ -2278,6 +2425,8 @@ function deleteTransaction(txId) {
     appState.transactions = appState.transactions.filter(t => t.id !== txId);
     saveData();
     showToast('تم حذف الحركة وإعادة احتساب الأرصدة فوراً', 'info');
+    populateCutsDatalists();
+    updateSidebarKPIs();
     renderDashboard();
     renderExcelSheet();
     renderTransactionsView();
@@ -2550,6 +2699,11 @@ function openModal(modalId) {
     modal.querySelectorAll('input[type="date"]').forEach(inp => {
       if (!inp.value) inp.value = new Date().toISOString().split('T')[0];
     });
+
+    if (modalId === 'stockInModal') {
+      populateCutsDatalists();
+      handleInCutSelected();
+    }
 
     if (modalId === 'stockOutModal') {
       populateCutsDatalists();
