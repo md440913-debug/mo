@@ -503,19 +503,71 @@ function getCutStats(cutNumber) {
   let inPieces = 0, inRolls = 0, inWeight = 0;
   let outPieces = 0, outRolls = 0, outWeight = 0;
 
+  // Track stages and workshops explicitly
+  const STAGES_KEYS = ['قص', 'طباعة', 'تطريز', 'خياطة', 'تجهيز', 'تشطيب'];
+  const stagesData = {};
+  STAGES_KEYS.forEach(s => {
+    stagesData[s] = {
+      stage: s,
+      sent: 0,
+      received: 0,
+      inWorkshop: 0,
+      parties: [],
+      lastDate: null
+    };
+  });
+
   txs.forEach(t => {
     const pieces = Number(t.pieces) || 0;
     const rolls = Number(t.rolls) || 0;
     const weight = Number(t.weightKg) || 0;
+    const stage = (t.stage || 'قص').trim();
+
+    if (!stagesData[stage]) {
+      stagesData[stage] = {
+        stage,
+        sent: 0,
+        received: 0,
+        inWorkshop: 0,
+        parties: [],
+        lastDate: null
+      };
+    }
+
+    if (t.party && !stagesData[stage].parties.includes(t.party)) {
+      stagesData[stage].parties.push(t.party);
+    }
+    if (t.date) {
+      if (!stagesData[stage].lastDate || new Date(t.date) > new Date(stagesData[stage].lastDate)) {
+        stagesData[stage].lastDate = t.date;
+      }
+    }
 
     if (t.type === 'وارد') {
       inPieces += pieces;
       inRolls += rolls;
       inWeight += weight;
+      stagesData[stage].received += pieces;
     } else if (t.type === 'صرف') {
       outPieces += pieces;
       outRolls += rolls;
       outWeight += weight;
+      stagesData[stage].sent += pieces;
+    }
+  });
+
+  // Calculate live in-workshop balances for stages
+  let totalInWorkshops = 0;
+  const workshopSummaries = [];
+
+  Object.keys(stagesData).forEach(s => {
+    const st = stagesData[s];
+    if (s !== 'قص') {
+      st.inWorkshop = Math.max(0, st.sent - st.received);
+      if (st.inWorkshop > 0) {
+        totalInWorkshops += st.inWorkshop;
+        workshopSummaries.push(`${s}: ${st.inWorkshop.toLocaleString()} ق`);
+      }
     }
   });
 
@@ -523,18 +575,19 @@ function getCutStats(cutNumber) {
   const balanceRolls = inRolls - outRolls;
   const balanceWeight = inWeight - outWeight;
 
+  const targetPieces = cut ? (Number(cut.targetPieces) || inPieces) : inPieces;
   const issuedPercent = inPieces > 0 ? Math.min(100, Math.round((outPieces / inPieces) * 100)) : 0;
 
-  let status = "متوفر";
+  let status = "متوفر بالمخزن";
   if (inPieces === 0) {
     status = "لم يبدأ التوريد";
-  } else if (balancePieces <= 0) {
+  } else if (balancePieces <= 0 && totalInWorkshops === 0) {
     status = "منصرف بالكامل";
+  } else if (totalInWorkshops > 0) {
+    status = `بالورش (${totalInWorkshops.toLocaleString()} ق)`;
   } else if (outPieces > 0) {
     status = "منصرف جزئياً";
   }
-
-  const targetPieces = cut ? (Number(cut.targetPieces) || inPieces) : inPieces;
 
   return {
     cutNumber,
@@ -550,7 +603,10 @@ function getCutStats(cutNumber) {
     balanceRolls,
     balanceWeight,
     issuedPercent,
-    status
+    status,
+    stagesData,
+    totalInWorkshops,
+    workshopSummary: workshopSummaries.join(' • ')
   };
 }
 
@@ -944,21 +1000,32 @@ function renderCutsView() {
           </span>
         </div>
 
-        <!-- Metrics Grid -->
-        <div class="grid grid-cols-3 gap-2 bg-gray-50 p-2.5 rounded-lg border border-gray-100 text-center text-xs">
+        <!-- Metrics Grid (Target, In, Out, Stock) -->
+        <div class="grid grid-cols-4 gap-1.5 bg-gray-50 p-2 rounded-lg border border-gray-100 text-center text-xs">
           <div>
-            <span class="text-gray-400 block text-[10px]">الكمية المقصوصة</span>
+            <span class="text-gray-400 block text-[9px]">المقصوص</span>
+            <strong class="text-gray-700 font-bold">${stats.targetPieces.toLocaleString()}</strong>
+          </div>
+          <div>
+            <span class="text-gray-400 block text-[9px]">الوارد</span>
             <strong class="text-green-700 font-bold">${stats.inPieces.toLocaleString()}</strong>
           </div>
           <div>
-            <span class="text-gray-400 block text-[10px]">المنصرف للورش</span>
+            <span class="text-gray-400 block text-[9px]">المنصرف</span>
             <strong class="text-red-700 font-bold">${stats.outPieces.toLocaleString()}</strong>
           </div>
           <div>
-            <span class="text-gray-400 block text-[10px]">الرصيد المتبقي</span>
-            <strong class="text-excel-700 font-black text-sm">${stats.balancePieces.toLocaleString()}</strong>
+            <span class="text-gray-400 block text-[9px]">المتبقي</span>
+            <strong class="text-excel-700 font-black text-xs">${stats.balancePieces.toLocaleString()}</strong>
           </div>
         </div>
+
+        ${stats.totalInWorkshops > 0 ? `
+          <div class="text-[11px] bg-amber-50 text-amber-900 border border-amber-200 rounded-lg px-2.5 py-1 flex items-center justify-between">
+            <span class="font-bold flex items-center gap-1"><i class="fa-solid fa-industry text-amber-600"></i> جاري بالورش:</span>
+            <span class="font-bold font-mono">${stats.totalInWorkshops.toLocaleString()} ق</span>
+          </div>
+        ` : ''}
 
         <!-- Progress Bar -->
         <div>
@@ -1564,14 +1631,27 @@ function handleInCutSelected() {
     const fabricEl = document.getElementById('inBannerFabric');
     const targetEl = document.getElementById('inBannerTargetPieces');
     const receivedEl = document.getElementById('inBannerReceivedPieces');
+    const issuedEl = document.getElementById('inBannerIssuedPieces');
     const balanceEl = document.getElementById('inBannerBalancePieces');
+    const workshopPill = document.getElementById('inBannerWorkshopPill');
+    const workshopText = document.getElementById('inBannerWorkshopText');
 
     if (cutCodeEl) cutCodeEl.textContent = cutNumber;
     if (modelEl) modelEl.textContent = cut ? cut.modelName : '-';
     if (fabricEl) fabricEl.textContent = cut ? `${cut.fabricType || ''} ${cut.color ? '• ' + cut.color : ''}` : '-';
-    if (targetEl) targetEl.textContent = `${(cut?.targetPieces || stats.inPieces).toLocaleString()} ق`;
+    if (targetEl) targetEl.textContent = `${stats.targetPieces.toLocaleString()} ق`;
     if (receivedEl) receivedEl.textContent = `${stats.inPieces.toLocaleString()} ق`;
+    if (issuedEl) issuedEl.textContent = `${stats.outPieces.toLocaleString()} ق`;
     if (balanceEl) balanceEl.textContent = `${stats.balancePieces.toLocaleString()} ق`;
+
+    if (workshopPill && workshopText) {
+      if (stats.totalInWorkshops > 0) {
+        workshopPill.classList.remove('hidden');
+        workshopText.textContent = `${stats.totalInWorkshops.toLocaleString()} قطعة (${stats.workshopSummary})`;
+      } else {
+        workshopPill.classList.add('hidden');
+      }
+    }
   }
 }
 
@@ -1587,13 +1667,11 @@ function handleStockInSubmit(e) {
   e.preventDefault();
 
   const cutNumber = (document.getElementById('inCutNumberSelect')?.value || document.getElementById('inCutNumber')?.value || '').trim().toUpperCase();
-  const modelName = document.getElementById('inModelName').value.trim();
-  const fabricType = document.getElementById('inFabricType').value.trim();
-  const color = document.getElementById('inColor').value.trim();
   const pieces = Number(document.getElementById('inPieces').value) || 0;
   const rolls = Number(document.getElementById('inRolls').value) || 0;
   const weightKg = Number(document.getElementById('inWeight').value) || 0;
   const party = document.getElementById('inParty').value.trim();
+  const stage = (document.getElementById('inStage')?.value || 'قص').trim();
   const responsible = document.getElementById('inResponsible').value.trim();
   const date = document.getElementById('inDate').value || new Date().toISOString().split('T')[0];
   const docNumber = document.getElementById('inDocNumber').value.trim() || `IN-${Date.now().toString().slice(-4)}`;
@@ -1615,22 +1693,27 @@ function handleStockInSubmit(e) {
     return;
   }
 
-  // Create In Transaction linked to Master Cut
+  // Create In Transaction linked to Master Cut & Stage
   const newTx = {
     id: `TX-IN-${Date.now()}`,
     cutNumber,
     modelName: existingCut.modelName,
     type: 'وارد',
-    stage: 'قص',
+    stage: stage || 'قص',
     pieces,
     rolls,
     weightKg,
-    party: party || 'عنبر ومقصدار المصنع',
+    party: party || (stage === 'قص' ? 'عنبر ومقصدار المصنع' : 'ورشة الإنتاج'),
     responsible: responsible || 'أمين المخزن',
     date,
     docNumber,
     notes
   };
+
+  // If receiving from a workshop, update cut stage display
+  if (stage && stage !== 'قص') {
+    existingCut.stage = `عائد من ${stage}`;
+  }
 
   appState.transactions.push(newTx);
   saveData();
@@ -1640,7 +1723,7 @@ function handleStockInSubmit(e) {
   const inBanner = document.getElementById('inCutInfoBanner');
   if (inBanner) inBanner.classList.add('hidden');
 
-  showToast(`تم تسجيل الوارد بنجاح (+${pieces.toLocaleString()} قطعة لقصة ${cutNumber})`, 'success');
+  showToast(`تم تسجيل الوارد بنجاح (+${pieces.toLocaleString()} قطعة [${stage}] لقصة ${cutNumber})`, 'success');
 
   // Real-time refresh across all sheets and dashboard without page reload
   populateCutsDatalists();
@@ -1656,17 +1739,22 @@ function handleOutCutSelected() {
   const cutCodeBadge = document.getElementById('outBannerCutCode');
   const modelBadge = document.getElementById('outModelNameBadge');
   const stageBadge = document.getElementById('outStageBadge');
+  const targetPiecesEl = document.getElementById('outTargetPiecesText');
   const totalCutPiecesEl = document.getElementById('outTotalCutPiecesText');
   const prevIssuedEl = document.getElementById('outPreviouslyIssuedText');
   const availPiecesEl = document.getElementById('outAvailablePiecesText');
+  const workshopPill = document.getElementById('outWorkshopBreakdownPill');
+  const workshopText = document.getElementById('outWorkshopBreakdownText');
 
   if (!cutNumber) {
     if (cutCodeBadge) cutCodeBadge.textContent = '-';
     if (modelBadge) modelBadge.textContent = '-';
     if (stageBadge) stageBadge.textContent = 'بالمخزن';
+    if (targetPiecesEl) targetPiecesEl.textContent = '0 ق';
     if (totalCutPiecesEl) totalCutPiecesEl.textContent = '0 ق';
     if (prevIssuedEl) prevIssuedEl.textContent = '0 ق';
     if (availPiecesEl) availPiecesEl.textContent = '0 ق';
+    if (workshopPill) workshopPill.classList.add('hidden');
     validateOutgoingBalance();
     return;
   }
@@ -1675,9 +1763,19 @@ function handleOutCutSelected() {
   if (cutCodeBadge) cutCodeBadge.textContent = stats.cutNumber;
   if (modelBadge) modelBadge.textContent = stats.modelName;
   if (stageBadge) stageBadge.textContent = stats.status;
+  if (targetPiecesEl) targetPiecesEl.textContent = `${stats.targetPieces.toLocaleString()} ق`;
   if (totalCutPiecesEl) totalCutPiecesEl.textContent = `${stats.inPieces.toLocaleString()} ق`;
   if (prevIssuedEl) prevIssuedEl.textContent = `${stats.outPieces.toLocaleString()} ق`;
   if (availPiecesEl) availPiecesEl.textContent = `${stats.balancePieces.toLocaleString()} ق`;
+
+  if (workshopPill && workshopText) {
+    if (stats.totalInWorkshops > 0) {
+      workshopPill.classList.remove('hidden');
+      workshopText.textContent = `${stats.totalInWorkshops.toLocaleString()} ق (${stats.workshopSummary})`;
+    } else {
+      workshopPill.classList.add('hidden');
+    }
+  }
 
   validateOutgoingBalance();
 }
@@ -1726,7 +1824,7 @@ function validateOutgoingBalance() {
     if (errorBanner) {
       errorBanner.classList.remove('hidden');
       if (errorMsg) {
-        errorMsg.innerHTML = `الكمية المطلوبة للصرف (<strong>${requestedPieces.toLocaleString()}</strong> قطعة) تتجاوز الرصيد المتبقي المتاح حالياً (<strong>${stats.balancePieces.toLocaleString()}</strong> قطعة).<br><span class="text-[11px] text-red-700">إجمالي الوارد: ${stats.inPieces.toLocaleString()} ق • المنصرف سابقاً: ${stats.outPieces.toLocaleString()} ق</span>. يرجى تقليل الكمية فوراً!`;
+        errorMsg.innerHTML = `الكمية المطلوبة للصرف (<strong>${requestedPieces.toLocaleString()}</strong> قطعة) تتجاوز الرصيد المتبقي المتاح حالياً بالمخزن (<strong>${stats.balancePieces.toLocaleString()}</strong> قطعة).<br><span class="text-[11px] text-red-700">المقصوص المستهدف: ${stats.targetPieces.toLocaleString()} ق • إجمالي الوارد: ${stats.inPieces.toLocaleString()} ق • المنصرف سابقاً: ${stats.outPieces.toLocaleString()} ق</span>. يرجى تقليل الكمية فوراً!`;
       }
     }
     if (validBanner) validBanner.classList.add('hidden');
@@ -1809,6 +1907,12 @@ function handleStockOutSubmit(e) {
     notes: notes ? `${notes} [المُسلّم: ${storekeeper}]` : `[المُسلّم: ${storekeeper}]`
   };
 
+  // Update master cut stage note
+  const cut = appState.cuts.find(c => c.cutNumber === cutNumber);
+  if (cut) {
+    cut.stage = stage || 'خياطة';
+  }
+
   appState.transactions.push(newTx);
   saveData();
 
@@ -1817,7 +1921,7 @@ function handleStockOutSubmit(e) {
   const validBanner = document.getElementById('outValidBanner');
   if (validBanner) validBanner.classList.add('hidden');
 
-  showToast(`تم تسجيل إذن الصرف بنجاح (-${pieces.toLocaleString()} قطعة للورشة لقصة ${cutNumber})`, 'success');
+  showToast(`تم تسجيل إذن الصرف بنجاح (-${pieces.toLocaleString()} قطعة [${stage}] لقصة ${cutNumber})`, 'success');
 
   // Real-time refresh across all views and dropdowns without page reload
   populateCutsDatalists();
@@ -2293,21 +2397,39 @@ function viewCutDetails(cutNumber) {
         </div>
       </div>
 
-      <div class="grid grid-cols-3 gap-3 text-center bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
+      <div class="grid grid-cols-4 gap-2 text-center bg-white p-3 rounded-xl border border-gray-200 shadow-sm min-w-[340px]">
         <div>
-          <span class="text-gray-400 block text-[11px]">الكمية المقصوصة</span>
-          <strong class="text-base text-gray-800">${(cut.targetPieces || 0).toLocaleString()} ق</strong>
+          <span class="text-gray-400 block text-[10px]">المقصوص (Target)</span>
+          <strong class="text-sm text-gray-800">${(cut.targetPieces || stats.targetPieces || 0).toLocaleString()} ق</strong>
         </div>
         <div>
-          <span class="text-gray-400 block text-[11px]">المنصرف حتى الآن</span>
-          <strong class="text-base text-red-600">${stats.outPieces.toLocaleString()} ق</strong>
+          <span class="text-gray-400 block text-[10px]">إجمالي الوارد (In)</span>
+          <strong class="text-sm text-green-700 font-bold">${stats.inPieces.toLocaleString()} ق</strong>
         </div>
         <div>
-          <span class="text-gray-400 block text-[11px]">الرصيد المتبقي</span>
-          <strong class="text-base text-excel-700 font-black">${stats.balancePieces.toLocaleString()} ق</strong>
+          <span class="text-gray-400 block text-[10px]">المنصرف (Out)</span>
+          <strong class="text-sm text-red-600 font-bold">${stats.outPieces.toLocaleString()} ق</strong>
+        </div>
+        <div>
+          <span class="text-gray-400 block text-[10px]">المتاح بالمخزن</span>
+          <strong class="text-sm text-excel-700 font-black">${stats.balancePieces.toLocaleString()} ق</strong>
         </div>
       </div>
     </div>
+
+    <!-- Active In Workshop Notice (if any) -->
+    ${stats.totalInWorkshops > 0 ? `
+      <div class="bg-amber-50 border border-amber-300 rounded-xl p-3 flex items-center justify-between text-xs text-amber-900 shadow-xs">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-industry text-base text-amber-600"></i>
+          <div>
+            <strong class="font-bold">تشغيل خارجي بالورش:</strong>
+            <span class="mr-1">${stats.workshopSummary}</span>
+          </div>
+        </div>
+        <span class="font-black bg-amber-200/80 px-2.5 py-1 rounded text-amber-950">${stats.totalInWorkshops.toLocaleString()} قطعة قيد التشغيل</span>
+      </div>
+    ` : ''}
 
     <!-- Specifications Grid -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-gray-50 p-3.5 rounded-xl border border-gray-200 text-xs">
@@ -2315,6 +2437,55 @@ function viewCutDetails(cutNumber) {
       <div><span class="text-gray-400 block text-[11px]">نوع القماش:</span><strong>${cut.fabricType || 'قماش عام'}</strong></div>
       <div><span class="text-gray-400 block text-[11px]">اللون العام:</span><strong>${cut.color || 'ألوان متعددة'}</strong></div>
       <div><span class="text-gray-400 block text-[11px]">الموسم:</span><strong>${cut.season || '2025'}</strong></div>
+    </div>
+
+    <!-- Multi-Stage Production Tracking Table -->
+    <div class="bg-white rounded-xl border border-indigo-200 overflow-hidden shadow-xs">
+      <div class="bg-indigo-50/80 px-4 py-2.5 border-b border-indigo-200 flex justify-between items-center font-bold text-indigo-950 text-xs">
+        <span class="flex items-center gap-2"><i class="fa-solid fa-network-wired text-indigo-600"></i> مسار مراحل الإنتاج وتتبع الورش (Stage Workflow & Workshop Balance)</span>
+        <span class="text-[11px] bg-white px-2 py-0.5 rounded text-indigo-800 border border-indigo-200">الرصيد المتبقي بالورش: ${stats.totalInWorkshops.toLocaleString()} قطعة</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-right text-xs">
+          <thead class="bg-gray-100 text-gray-700 font-bold border-b border-gray-200">
+            <tr>
+              <th class="p-2.5">المرحلة الإنتاجية</th>
+              <th class="p-2.5 text-center">المنصرف للورشة (Out)</th>
+              <th class="p-2.5 text-center">المستلم عائداً للمخزن (In)</th>
+              <th class="p-2.5 text-center">المتبقي بالورشة (In Workshop)</th>
+              <th class="p-2.5">الورش والجهات المنفذة</th>
+              <th class="p-2.5 text-center">الحالة</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            ${['قص', 'طباعة', 'تطريز', 'خياطة', 'تجهيز', 'تشطيب'].map(stKey => {
+              const st = stats.stagesData[stKey] || { sent: 0, received: 0, inWorkshop: 0, parties: [] };
+              let badge = '<span class="px-2 py-0.5 rounded text-[10px] bg-gray-100 text-gray-600">لم تبدأ</span>';
+              if (stKey === 'قص') {
+                badge = st.received > 0 ? '<span class="px-2 py-0.5 rounded text-[10px] bg-green-100 text-green-800 font-bold">تم القص والتوريد</span>' : '<span class="px-2 py-0.5 rounded text-[10px] bg-gray-100 text-gray-500">جاري</span>';
+              } else if (st.inWorkshop > 0) {
+                badge = '<span class="px-2 py-0.5 rounded text-[10px] bg-amber-100 text-amber-900 font-bold animate-pulse">قيد التشغيل</span>';
+              } else if (st.sent > 0 && st.inWorkshop === 0) {
+                badge = '<span class="px-2 py-0.5 rounded text-[10px] bg-blue-100 text-blue-800 font-bold">عائد بالكامل</span>';
+              }
+
+              return `
+                <tr class="${st.inWorkshop > 0 ? 'bg-amber-50/40' : ''}">
+                  <td class="p-2.5 font-bold flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full ${st.inWorkshop > 0 ? 'bg-amber-500' : (st.sent > 0 || st.received > 0 ? 'bg-emerald-500' : 'bg-gray-300')}"></span>
+                    ${stKey}
+                  </td>
+                  <td class="p-2.5 text-center font-bold text-red-600">${st.sent ? st.sent.toLocaleString() + ' ق' : '-'}</td>
+                  <td class="p-2.5 text-center font-bold text-green-700">${st.received ? st.received.toLocaleString() + ' ق' : '-'}</td>
+                  <td class="p-2.5 text-center font-black ${st.inWorkshop > 0 ? 'text-amber-800 bg-amber-100/60 rounded' : 'text-gray-400'}">${st.inWorkshop ? st.inWorkshop.toLocaleString() + ' ق' : '-'}</td>
+                  <td class="p-2.5 text-gray-600">${st.parties.length > 0 ? st.parties.join(', ') : '-'}</td>
+                  <td class="p-2.5 text-center">${badge}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- Blouse Details Section -->

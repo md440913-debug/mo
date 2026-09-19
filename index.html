@@ -1163,19 +1163,27 @@
             </div>
             <span class="text-[11px] text-emerald-700 font-bold" id="inBannerFabric">-</span>
           </div>
-          <div class="grid grid-cols-3 gap-2 text-center text-[11px] bg-white p-2 rounded-lg border border-emerald-100">
+          <div class="grid grid-cols-4 gap-2 text-center text-[11px] bg-white p-2 rounded-lg border border-emerald-100">
             <div>
-              <span class="text-gray-400 block text-[10px]">الكمية المقصوصة</span>
+              <span class="text-gray-400 block text-[10px]">المقصوص (Target)</span>
               <strong class="text-gray-800 font-bold" id="inBannerTargetPieces">0 ق</strong>
             </div>
             <div>
-              <span class="text-gray-400 block text-[10px]">الوارد حتى الآن</span>
+              <span class="text-gray-400 block text-[10px]">الوارد (In)</span>
               <strong class="text-emerald-700 font-bold" id="inBannerReceivedPieces">0 ق</strong>
             </div>
             <div>
-              <span class="text-gray-400 block text-[10px]">الرصيد المتبقي</span>
+              <span class="text-gray-400 block text-[10px]">المنصرف (Out)</span>
+              <strong class="text-red-600 font-bold" id="inBannerIssuedPieces">0 ق</strong>
+            </div>
+            <div>
+              <span class="text-gray-400 block text-[10px]">الرصيد المتاح (Stock)</span>
               <strong class="text-excel-700 font-black" id="inBannerBalancePieces">0 ق</strong>
             </div>
+          </div>
+          <div id="inBannerWorkshopPill" class="mt-2 text-[11px] bg-white text-emerald-900 border border-emerald-200 rounded-lg p-1.5 hidden flex items-center justify-between">
+            <span class="font-bold flex items-center gap-1"><i class="fa-solid fa-industry text-emerald-600"></i> جاري تشغيلها بالورش:</span>
+            <span id="inBannerWorkshopText" class="font-bold text-emerald-800">0 قطعة</span>
           </div>
         </div>
 
@@ -1209,10 +1217,22 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-3 gap-3">
           <div>
             <label class="block font-bold text-gray-700 mb-1">المصدر / جهة التوريد</label>
             <input type="text" id="inParty" value="مقصدار المصنع" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-stockin focus:outline-none">
+          </div>
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">المرحلة الإنتاجية / نوع الوارد *</label>
+            <select id="inStage" required class="w-full bg-gray-50 border border-gray-300 rounded-lg p-2 font-bold text-gray-700 focus:ring-2 focus:ring-stockin focus:outline-none">
+              <option value="قص">توريد من صالة القص</option>
+              <option value="طباعة">استلام عائد من الطباعة</option>
+              <option value="تطريز">استلام عائد من التطريز</option>
+              <option value="خياطة">استلام عائد من الخياطة</option>
+              <option value="تجهيز">استلام عائد من التجهيز</option>
+              <option value="تشطيب">استلام نهائي من التشطيب</option>
+              <option value="مرتجع">مرتجع تشغيل للمخزن</option>
+            </select>
           </div>
           <div>
             <label class="block font-bold text-gray-700 mb-1">اسم المستلم / المسؤول</label>
@@ -1287,19 +1307,27 @@
             <span id="outStageBadge" class="text-[10px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">بالمخزن</span>
           </div>
 
-          <div class="grid grid-cols-3 gap-2 text-center text-xs bg-white p-2.5 rounded-lg border border-gray-200 shadow-xs">
+          <div class="grid grid-cols-4 gap-2 text-center text-xs bg-white p-2.5 rounded-lg border border-gray-200 shadow-xs">
             <div>
-              <span class="text-gray-400 block text-[10px]">إجمالي الوارد (Total Cut)</span>
+              <span class="text-gray-400 block text-[10px]">المقصوص (Target)</span>
+              <strong id="outTargetPiecesText" class="text-xs text-gray-700 font-bold">0 ق</strong>
+            </div>
+            <div>
+              <span class="text-gray-400 block text-[10px]">إجمالي الوارد (In)</span>
               <strong id="outTotalCutPiecesText" class="text-xs text-green-700 font-bold">0 ق</strong>
             </div>
             <div>
-              <span class="text-gray-400 block text-[10px]">المنصرف سابقاً للورش</span>
+              <span class="text-gray-400 block text-[10px]">المنصرف للورش (Out)</span>
               <strong id="outPreviouslyIssuedText" class="text-xs text-red-600 font-bold">0 ق</strong>
             </div>
             <div>
-              <span class="text-gray-400 block text-[10px]">الرصيد المتاح (Available)</span>
+              <span class="text-gray-400 block text-[10px]">الرصيد المتاح (Stock)</span>
               <strong id="outAvailablePiecesText" class="text-sm text-excel-700 font-black">0 ق</strong>
             </div>
+          </div>
+          <div id="outWorkshopBreakdownPill" class="mt-2 text-[11px] bg-amber-50 text-amber-900 border border-amber-200 rounded-lg p-1.5 hidden flex items-center justify-between">
+            <span class="font-bold flex items-center gap-1"><i class="fa-solid fa-industry text-amber-600"></i> جاري تشغيلها بالورش:</span>
+            <span id="outWorkshopBreakdownText" class="font-bold">0 قطعة</span>
           </div>
         </div>
 
